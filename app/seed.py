@@ -1,48 +1,62 @@
-from database import get_db_connection, get_db_cursor
-from uuid import uuid4
-from datetime import datetime
+"""
+Quick seed for 10-day testing.
+Run from project root: python -m app.seed
+"""
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-def seed_sample_data():
-    """Load 10 sample MSMEs for testing"""
-    
-    with get_db_connection() as conn:
-        with get_db_cursor(conn) as cursor:
-            # Create sample CA
-            ca_id = uuid4()
-            ca_user_id = uuid4()
-            
-            cursor.execute(
-                """INSERT INTO users (id, email, name, phone, user_type)
-                   VALUES (%s, %s, %s, %s, %s)""",
-                (ca_user_id, "testca@example.com", "Test CA", "9999999999", "CA")
-            )
-            
-            cursor.execute(
-                """INSERT INTO cas (id, firm_name, icai_membership, client_count)
-                   VALUES (%s, %s, %s, %s)""",
-                (ca_id, "Test CA Firm", "A12345", 10)
-            )
-            
-            # Create 10 sample clients
-            for i in range(10):
-                client_id = uuid4()
-                gstin = f"27AABCT{1234+i:04d}H1Z0"
-                
-                cursor.execute(
-                    """INSERT INTO clients 
-                       (id, ca_id, client_name, gstin, industry, annual_turnover, consent_given, consent_date)
-                       VALUES (%s, %s, %s, %s, %s, %s, TRUE, CURRENT_TIMESTAMP)""",
-                    (
-                        client_id,
-                        ca_id,
-                        f"ABC Manufacturing {i+1}",
-                        gstin,
-                        "Manufacturing",
-                        6000000,
-                    )
-                )
-            
-            print(f"✅ Sample data loaded: 1 CA + 10 clients")
+from app.database import SessionLocal, create_tables
+from app.models import Partner, Client
+
+
+def seed():
+    create_tables()
+    db = SessionLocal()
+    try:
+        if db.query(Partner).first():
+            print("Database already has data — skipping seed.")
+            return
+
+        partner = Partner(
+            name="Sushant CA Firm",
+            email="sushant@vertibis.in",
+            phone="9876543210",
+            firm_type="CA",
+            gstin="27ABCDE1234F1Z5",
+            credits_balance=500,
+            status="active",
+        )
+        db.add(partner)
+        db.flush()
+
+        clients_data = [
+            dict(name="Ravi Textiles", business_name="Ravi Textiles Pvt Ltd",
+                 gstin="27AAACR1234D1ZV", industry="trading", turnover=6200000),
+            dict(name="Priya Manufacturing", business_name="Priya Mfg Works",
+                 gstin="27BBBCP5678E1Z3", industry="manufacturing", turnover=12000000),
+            dict(name="TechServ Solutions", business_name="TechServ Solutions LLP",
+                 gstin="27CCCCT9012F1Z1", industry="it", turnover=8000000),
+        ]
+
+        client_objs = []
+        for cd in clients_data:
+            c = Client(partner_id=partner.id, **cd)
+            db.add(c)
+            client_objs.append(c)
+
+        db.commit()
+        for c in client_objs:
+            db.refresh(c)
+
+        print(f"Seeded: 1 partner + {len(clients_data)} clients")
+        print(f"Partner ID: {partner.id}")
+        for c in client_objs:
+            print(f"  Client: {c.name}  ->  {c.id}")
+
+    finally:
+        db.close()
+
 
 if __name__ == "__main__":
-    seed_sample_data()
+    seed()

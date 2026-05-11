@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vertibis — MSME Health Scoring</title>
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; color: #1e293b; background: #f1f5f9; }
+button { cursor: pointer; font-family: inherit; }
+input, select, textarea { font-family: inherit; }
+a { text-decoration: none; color: inherit; }
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+#app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+#sidebar {
+  width: 240px; min-width: 240px; background: #0f172a; color: #94a3b8;
+  display: flex; flex-direction: column; padding: 0; overflow-y: auto;
+}
+.sidebar-logo {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid #1e293b;
+}
+.sidebar-logo .logo-text { font-size: 20px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.5px; }
+.sidebar-logo .logo-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+.sidebar-section { padding: 16px 12px 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #475569; }
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; margin: 1px 8px; border-radius: 8px;
+  cursor: pointer; color: #94a3b8; font-size: 13.5px; font-weight: 500;
+  transition: all 0.15s;
+}
+.nav-item:hover { background: #1e293b; color: #e2e8f0; }
+.nav-item.active { background: #1d4ed8; color: #fff; }
+.nav-item .nav-icon { width: 18px; text-align: center; font-size: 15px; flex-shrink: 0; }
+.nav-item .nav-badge {
+  margin-left: auto; background: #1d4ed8; color: #fff;
+  font-size: 10px; padding: 1px 7px; border-radius: 10px; font-weight: 600;
+}
+.nav-item.active .nav-badge { background: rgba(255,255,255,0.25); }
+
+.sidebar-footer {
+  margin-top: auto; padding: 16px; border-top: 1px solid #1e293b;
+}
+.partner-card {
+  background: #1e293b; border-radius: 8px; padding: 10px 12px;
+}
+.partner-name { color: #f1f5f9; font-weight: 600; font-size: 12px; }
+.partner-meta { color: #64748b; font-size: 11px; margin-top: 2px; }
+.credits-display {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; background: #0f172a; border-radius: 6px; padding: 6px 10px;
+}
+.credits-count { color: #fbbf24; font-weight: 700; font-size: 15px; }
+.credits-label { color: #64748b; font-size: 11px; }
+
+/* ── Main content ────────────────────────────────────────────────────────── */
+#main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+#topbar {
+  background: #fff; border-bottom: 1px solid #e2e8f0;
+  padding: 0 28px; height: 56px; display: flex; align-items: center;
+  justify-content: space-between; flex-shrink: 0;
+}
+.page-title { font-size: 17px; font-weight: 700; color: #0f172a; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.partner-selector { display: flex; align-items: center; gap: 8px; }
+.partner-selector select {
+  border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px;
+  font-size: 13px; color: #334155; background: #f8fafc;
+}
+
+#content-area { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+/* ── Pages ───────────────────────────────────────────────────────────────── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── Cards & Stats ────────────────────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: #fff; border-radius: 12px; padding: 18px 20px;
+  border: 1px solid #e2e8f0; transition: box-shadow 0.2s;
+}
+.stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.stat-label { font-size: 12px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 28px; font-weight: 800; color: #0f172a; margin: 4px 0 2px; line-height: 1; }
+.stat-sub { font-size: 11px; color: #94a3b8; }
+.stat-icon { font-size: 22px; margin-bottom: 8px; }
+
+/* ── Table ────────────────────────────────────────────────────────────────── */
+.card {
+  background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
+  overflow: hidden; margin-bottom: 20px;
+}
+.card-header {
+  padding: 16px 20px; border-bottom: 1px solid #f1f5f9;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title { font-size: 14px; font-weight: 700; color: #0f172a; }
+.card-action { font-size: 12px; color: #3b82f6; cursor: pointer; }
+table { width: 100%; border-collapse: collapse; }
+th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
+td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f8fafc; color: #334155; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafbfc; }
+
+/* ── Score badge ─────────────────────────────────────────────────────────── */
+.score-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+}
+.score-healthy { background: #d1fae5; color: #065f46; }
+.score-moderate { background: #fef3c7; color: #92400e; }
+.score-atrisk { background: #ffedd5; color: #9a3412; }
+.score-critical { background: #fee2e2; color: #991b1b; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  border: none; transition: all 0.15s; white-space: nowrap;
+}
+.btn-primary { background: #1d4ed8; color: #fff; }
+.btn-primary:hover { background: #1e40af; }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-secondary { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-success { background: #10b981; color: #fff; }
+.btn-success:hover { background: #059669; }
+.btn-warning { background: #f59e0b; color: #fff; }
+.btn-warning:hover { background: #d97706; }
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-ghost { background: transparent; color: #64748b; border: 1px solid #e2e8f0; }
+.btn-ghost:hover { background: #f8fafc; }
+.btn-lg { padding: 12px 28px; font-size: 15px; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* ── Wizard ──────────────────────────────────────────────────────────────── */
+.wizard-header { margin-bottom: 28px; }
+.wizard-header h2 { font-size: 22px; font-weight: 800; color: #0f172a; }
+.wizard-header p { color: #64748b; margin-top: 4px; font-size: 13px; }
+
+.step-indicator {
+  display: flex; align-items: center; margin-bottom: 32px;
+}
+.step-item {
+  display: flex; align-items: center; flex: 1;
+}
+.step-item:last-child { flex: none; }
+.step-circle {
+  width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0;
+  border: 2px solid #e2e8f0; background: #fff; color: #94a3b8;
+  transition: all 0.3s;
+}
+.step-circle.done { background: #10b981; border-color: #10b981; color: #fff; }
+.step-circle.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.step-label { margin-left: 10px; font-size: 13px; font-weight: 600; color: #94a3b8; }
+.step-label.active { color: #1d4ed8; }
+.step-label.done { color: #10b981; }
+.step-line { flex: 1; height: 2px; background: #e2e8f0; margin: 0 12px; }
+.step-line.done { background: #10b981; }
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+.form-section { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 24px; margin-bottom: 20px; }
+.form-section-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+label { font-size: 12px; font-weight: 600; color: #374151; }
+.label-req { color: #ef4444; margin-left: 2px; }
+input[type="text"], input[type="number"], input[type="email"], select, textarea {
+  border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 9px 12px;
+  font-size: 13px; color: #1e293b; background: #fff; outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+input.error { border-color: #ef4444; }
+.form-hint { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.form-error { font-size: 11px; color: #ef4444; margin-top: 2px; }
+
+/* ── File Upload Zones ───────────────────────────────────────────────────── */
+.file-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.file-group-label { font-size: 13px; font-weight: 700; color: #1e293b; }
+.fy-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+.fy-badge.fy1 { background: #dbeafe; color: #1e40af; }
+.fy-badge.fy2 { background: #d1fae5; color: #065f46; }
+.fy-badge.itr { background: #ede9fe; color: #4c1d95; }
+
+.file-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.file-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.file-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+.file-zone {
+  border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  cursor: pointer; transition: all 0.2s; position: relative;
+  background: #fafafa; min-height: 100px; justify-content: center;
+}
+.file-zone:hover { border-color: #3b82f6; background: #eff6ff; }
+.file-zone.has-file { border-color: #10b981; background: #f0fdf4; border-style: solid; }
+.file-zone.has-file:hover { border-color: #059669; background: #ecfdf5; }
+.file-zone.required-missing { border-color: #fca5a5; background: #fff5f5; }
+.file-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+.file-zone-icon { font-size: 22px; }
+.file-zone-name { font-size: 12px; font-weight: 700; color: #334155; text-align: center; }
+.file-zone-sub { font-size: 10px; color: #94a3b8; text-align: center; }
+.file-zone-status { font-size: 11px; font-weight: 600; }
+.file-zone.has-file .file-zone-icon::after { content: " ✓"; }
+.file-zone.has-file .file-zone-status { color: #059669; }
+.file-zone-badge {
+  position: absolute; top: 8px; right: 8px;
+  font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-req { background: #fee2e2; color: #991b1b; }
+.badge-opt { background: #f1f5f9; color: #64748b; }
+
+.remove-file-btn {
+  position: absolute; top: 6px; left: 6px; width: 18px; height: 18px;
+  background: #ef4444; color: #fff; border: none; border-radius: 50%;
+  font-size: 10px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 2; opacity: 0; transition: opacity 0.15s;
+}
+.file-zone.has-file:hover .remove-file-btn { opacity: 1; }
+
+/* ── Missing files warning ───────────────────────────────────────────────── */
+.missing-alert {
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.missing-alert.warn { background: #fffbeb; border: 1px solid #fcd34d; }
+.missing-alert.error { background: #fef2f2; border: 1px solid #fca5a5; }
+.missing-alert.success { background: #f0fdf4; border: 1px solid #86efac; }
+.missing-alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.missing-alert-body { flex: 1; }
+.missing-alert-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+.missing-alert-list { margin-top: 6px; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.missing-alert-list li {
+  font-size: 11px; padding: 2px 8px; background: #fecaca; color: #7f1d1d;
+  border-radius: 4px; font-weight: 500;
+}
+
+.wizard-actions {
+  display: flex; gap: 10px; align-items: center;
+  padding: 20px 0 8px; border-top: 1px solid #f1f5f9; margin-top: 8px;
+}
+
+/* ── Results page ────────────────────────────────────────────────────────── */
+.result-container { max-width: 760px; margin: 0 auto; }
+.result-top {
+  display: grid; grid-template-columns: auto 1fr; gap: 32px;
+  background: #fff; border-radius: 16px; border: 1px solid #e2e8f0;
+  padding: 32px; margin-bottom: 20px; align-items: center;
+}
+.score-circle-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.score-label-badge {
+  padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 800;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.client-score-info h2 { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+.client-score-info .sub { color: #64748b; font-size: 13px; margin-bottom: 16px; }
+.component-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.component-item { background: #f8fafc; border-radius: 8px; padding: 10px 14px; }
+.component-name { font-size: 11px; color: #64748b; font-weight: 500; }
+.component-bar-wrap { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.component-bar { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+.component-bar-fill { height: 100%; border-radius: 3px; background: #1d4ed8; transition: width 0.8s ease; }
+.component-val { font-size: 12px; font-weight: 700; color: #1e293b; min-width: 32px; text-align: right; }
+
+.issues-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 16px; }
+.issues-card h3 { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
+.issue-item {
+  display: flex; gap: 10px; padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.issue-item:last-child { border-bottom: none; }
+.issue-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-top: 5px; flex-shrink: 0; }
+.issue-text { font-size: 13px; color: #374151; }
+
+.advisory-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; }
+.advisory-card h3 { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+.advisory-text { font-size: 13px; color: #374151; line-height: 1.7; white-space: pre-line; }
+
+.result-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+
+.files-summary {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;
+}
+.file-tag {
+  font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500;
+}
+.file-tag.ok { background: #d1fae5; color: #065f46; }
+.file-tag.missing { background: #fee2e2; color: #991b1b; }
+
+/* ── Loading overlay ─────────────────────────────────────────────────────── */
+#loading-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,0.6);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 1000; display: none;
+}
+#loading-overlay.show { display: flex; }
+.spinner {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 5px solid rgba(255,255,255,0.2);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: #fff; font-size: 15px; font-weight: 600; margin-top: 16px; }
+.loading-sub { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 4px; }
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+#toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: #1e293b; color: #f1f5f9; padding: 12px 18px; border-radius: 10px;
+  font-size: 13px; font-weight: 500; min-width: 260px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  animation: slideIn 0.2s ease; display: flex; align-items: center; gap: 10px;
+}
+.toast.success { background: #064e3b; border-left: 4px solid #10b981; }
+.toast.error { background: #450a0a; border-left: 4px solid #ef4444; }
+.toast.warn { background: #451a03; border-left: 4px solid #f59e0b; }
+@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ── Misc ────────────────────────────────────────────────────────────────── */
+.empty-state { text-align: center; padding: 48px 20px; color: #94a3b8; }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; color: #475569; font-weight: 600; margin-bottom: 6px; }
+.text-muted { color: #94a3b8; }
+.mt-2 { margin-top: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.separator { border: none; border-top: 1px solid #f1f5f9; margin: 20px 0; }
+
+/* ── Sample files modal ──────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 500; display: none; align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: #fff; border-radius: 16px; padding: 28px;
+  width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+.modal-sub { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+.sample-file-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid #f1f5f9;
+}
+.sample-file-item:last-of-type { border-bottom: none; }
+.sample-file-name { font-size: 13px; font-weight: 600; color: #1e293b; }
+.sample-file-desc { font-size: 11px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">⚡ Vertibis</div>
+      <div class="logo-sub">MSME Health Scoring Platform</div>
+    </div>
+
+    <div class="sidebar-section">Main Menu</div>
+    <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard">
+      <span class="nav-icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="navigate('clients')" id="nav-clients">
+      <span class="nav-icon">🏢</span> Clients
+    </div>
+    <div class="nav-item" onclick="navigate('upload')" id="nav-upload">
+      <span class="nav-icon">📤</span> Upload & Score
+    </div>
+
+    <div class="sidebar-section">Tools</div>
+    <div class="nav-item" onclick="showSampleFilesModal()">
+      <span class="nav-icon">📁</span> Sample Files
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="partner-card">
+        <div class="partner-name" id="sidebar-partner-name">Loading…</div>
+        <div class="partner-meta" id="sidebar-partner-email"></div>
+        <div class="credits-display">
+          <span class="credits-count" id="sidebar-credits">—</span>
+          <span class="credits-label">credits remaining</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ────────────────────────────────────────────────────── -->
+  <div id="main-content">
+    <div id="topbar">
+      <div class="page-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-right">
+        <div class="partner-selector">
+          <span style="font-size:12px;color:#64748b;font-weight:500">Partner:</span>
+          <select id="partner-select" onchange="onPartnerChange()">
+            <option value="">Loading partners…</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="content-area">
+
+      <!-- ══════════════ DASHBOARD PAGE ══════════════ -->
+      <div id="page-dashboard" class="page active">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">🏢</div>
+            <div class="stat-label">Total Clients</div>
+            <div class="stat-value" id="stat-clients">—</div>
+            <div class="stat-sub">registered MSMEs</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-label">Reports Generated</div>
+            <div class="stat-value" id="stat-reports">—</div>
+            <div class="stat-sub">health scores</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">⭐</div>
+            <div class="stat-label">Avg Health Score</div>
+            <div class="stat-value" id="stat-avg">—</div>
+            <div class="stat-sub">out of 100</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💳</div>
+            <div class="stat-label">Credits Balance</div>
+            <div class="stat-value" id="stat-credits">—</div>
+            <div class="stat-sub">available</div>
+          </div>
+        </div>
+
+        <!-- Recent Reports -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Recent Health Score Reports</div>
+            <span class="card-action" onclick="navigate('clients')">View all clients →</span>
+          </div>
+          <div id="recent-reports-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Client Name</th>
+                  <th>Industry</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="recent-reports-table">
+                <tr><td colspan="6" class="text-muted" style="text-align:center;padding:32px">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Score Distribution -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Score Distribution</div>
+          </div>
+          <div id="dist-chart" style="padding:20px 24px;display:flex;gap:12px;align-items:flex-end;height:140px">
+            <div class="text-muted" style="font-size:12px">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ CLIENTS PAGE ══════════════ -->
+      <div id="page-clients" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <div>
+            <h2 style="font-size:20px;font-weight:800;color:#0f172a">Clients</h2>
+            <p style="font-size:13px;color:#64748b;margin-top:3px">All registered MSME clients</p>
+          </div>
+          <button class="btn btn-primary" onclick="navigate('upload')">
+            + Score New Client
+          </button>
+        </div>
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>Business Name</th>
+                <th>Industry</th>
+                <th>GSTIN</th>
+                <th>Latest Score</th>
+                <th>Last Updated</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="clients-table">
+              <tr><td colspan="6" class="text-muted" style="text-align:center;padding:32px">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════════ UPLOAD & SCORE PAGE ══════════════ -->
+      <div id="page-upload" class="page">
+
+        <!-- Step Indicator -->
+        <div class="step-indicator" id="step-indicator">
+          <div class="step-item">
+            <div class="step-circle active" id="sc-1">1</div>
+            <div class="step-label active" id="sl-1">Business Info</div>
+          </div>
+          <div class="step-line" id="sline-1"></div>
+          <div class="step-item">
+            <div class="step-circle" id="sc-2">2</div>
+            <div class="step-label" id="sl-2">Upload Files</div>
+          </div>
+          <div class="step-line" id="sline-2"></div>
+          <div class="step-item">
+            <div class="step-circle" id="sc-3">3</div>
+            <div class="step-label" id="sl-3">Review & Score</div>
+          </div>
+        </div>
+
+        <!-- ─── STEP 1: Business Info ─────────────────────────────────────── -->
+        <div id="wizard-step-1">
+          <div class="wizard-header">
+            <h2>Client Business Information</h2>
+            <p>Enter basic details about the MSME client you want to score</p>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">🏢 Business Details</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Client / Business Name <span class="label-req">*</span></label>
+                <input type="text" id="f-client-name" placeholder="e.g. Ravi Textiles Pvt Ltd">
+                <span class="form-error" id="err-client-name"></span>
+              </div>
+              <div class="form-group">
+                <label>GSTIN (optional)</label>
+                <input type="text" id="f-gstin" placeholder="e.g. 27AABCT1234H1Z0" maxlength="15">
+                <span class="form-hint">15-character GST identification number</span>
+              </div>
+              <div class="form-group">
+                <label>Industry <span class="label-req">*</span></label>
+                <select id="f-industry">
+                  <option value="trading">Trading</option>
+                  <option value="manufacturing">Manufacturing</option>
+                  <option value="services">Services</option>
+                  <option value="it">IT / Technology</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Annual Turnover (₹) <span class="label-req">*</span></label>
+                <input type="number" id="f-turnover" placeholder="e.g. 6200000">
+                <span class="form-hint">Approximate annual turnover in rupees</span>
+                <span class="form-error" id="err-turnover"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="wizard-actions">
+            <button class="btn btn-primary btn-lg" onclick="goToStep2()">
+              Continue to Upload Files →
+            </button>
+            <span class="text-muted" style="font-size:12px">Fields marked <span style="color:#ef4444">*</span> are required</span>
+          </div>
+        </div>
+
+        <!-- ─── STEP 2: File Upload ───────────────────────────────────────── -->
+        <div id="wizard-step-2" style="display:none">
+          <div class="wizard-header">
+            <h2>Upload Financial Documents</h2>
+            <p>Upload GST returns, ITR, and banking statements. You can skip files and still calculate a partial score.</p>
+          </div>
+
+          <!-- GST Returns FY 2024-25 -->
+          <div class="form-section">
+            <div class="form-section-title">
+              📑 GST Returns — FY 2024-25
+              <span class="fy-badge fy1">2024-25</span>
+            </div>
+            <div class="file-grid">
+              <div class="file-zone" id="zone-gstr1_fy1" onclick="triggerFile('gstr1_fy1')">
+                <input type="file" id="file-gstr1_fy1" accept=".json" onchange="fileSelected('gstr1_fy1', this)">
+                <span class="remove-file-btn" onclick="removeFile('gstr1_fy1',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📄</div>
+                <div class="file-zone-name">GSTR-1</div>
+                <div class="file-zone-sub" id="fname-gstr1_fy1">Outward Supplies · .json</div>
+                <div class="file-zone-status" id="fstatus-gstr1_fy1"></div>
+              </div>
+              <div class="file-zone" id="zone-gstr3b_fy1" onclick="triggerFile('gstr3b_fy1')">
+                <input type="file" id="file-gstr3b_fy1" accept=".json" onchange="fileSelected('gstr3b_fy1', this)">
+                <span class="remove-file-btn" onclick="removeFile('gstr3b_fy1',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📄</div>
+                <div class="file-zone-name">GSTR-3B</div>
+                <div class="file-zone-sub" id="fname-gstr3b_fy1">Summary Return · .json</div>
+                <div class="file-zone-status" id="fstatus-gstr3b_fy1"></div>
+              </div>
+              <div class="file-zone" id="zone-gstr2a_fy1" onclick="triggerFile('gstr2a_fy1')">
+                <input type="file" id="file-gstr2a_fy1" accept=".json" onchange="fileSelected('gstr2a_fy1', this)">
+                <span class="remove-file-btn" onclick="removeFile('gstr2a_fy1',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📄</div>
+                <div class="file-zone-name">GSTR-2A</div>
+                <div class="file-zone-sub" id="fname-gstr2a_fy1">ITC Details · .json</div>
+                <div class="file-zone-status" id="fstatus-gstr2a_fy1"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GST Returns FY 2025-26 -->
+          <div class="form-section">
+            <div class="form-section-title">
+              📑 GST Returns — FY 2025-26
+              <span class="fy-badge fy2">2025-26</span>
+            </div>
+            <div class="file-grid file-grid-4">
+              <div class="file-zone" id="zone-gstr1_fy2" onclick="triggerFile('gstr1_fy2')">
+                <input type="file" id="file-gstr1_fy2" accept=".json" onchange="fileSelected('gstr1_fy2', this)">
+                <span class="remove-file-btn" onclick="removeFile('gstr1_fy2',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📄</div>
+                <div class="file-zone-name">GSTR-1</div>
+                <div class="file-zone-sub" id="fname-gstr1_fy2">Outward Supplies · .json</div>
+                <div class="file-zone-status" id="fstatus-gstr1_fy2"></div>
+              </div>
+              <div class="file-zone" id="zone-gstr3b_fy2" onclick="triggerFile('gstr3b_fy2')">
+                <input type="file" id="file-gstr3b_fy2" accept=".json" onchange="fileSelected('gstr3b_fy2', this)">
+                <span class="remove-file-btn" onclick="removeFile('gstr3b_fy2',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📄</div>
+                <div class="file-zone-name">GSTR-3B</div>
+                <div class="file-zone-sub" id="fname-gstr3b_fy2">Summary Return · .json</div>
+                <div class="file-zone-status" id="fstatus-gstr3b_fy2"></div>
+              </div>
+              <div class="file-zone" id="zone-gstr2a_fy2" onclick="triggerFile('gstr2a_fy2')">
+                <input type="file" id="file-gstr2a_fy2" accept=".json" onchange="fileSelected('gstr2a_fy2', this)">
+                <span class="remove-file-btn" onclick="removeFile('gstr2a_fy2',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📄</div>
+                <div class="file-zone-name">GSTR-2A</div>
+                <div class="file-zone-sub" id="fname-gstr2a_fy2">ITC Details · .json</div>
+                <div class="file-zone-status" id="fstatus-gstr2a_fy2"></div>
+              </div>
+              <div class="file-zone" id="zone-banking_fy2" onclick="triggerFile('banking_fy2')">
+                <input type="file" id="file-banking_fy2" accept=".csv" onchange="fileSelected('banking_fy2', this)">
+                <span class="remove-file-btn" onclick="removeFile('banking_fy2',event)">✕</span>
+                <span class="file-zone-badge badge-opt">Optional</span>
+                <div class="file-zone-icon">🏦</div>
+                <div class="file-zone-name">Banking</div>
+                <div class="file-zone-sub" id="fname-banking_fy2">Bank Statement · .csv</div>
+                <div class="file-zone-status" id="fstatus-banking_fy2"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ITR Files -->
+          <div class="form-section">
+            <div class="form-section-title">
+              📋 Income Tax Returns
+              <span class="fy-badge itr">ITR</span>
+            </div>
+            <div class="file-grid file-grid-2">
+              <div class="file-zone" id="zone-itr_prev" onclick="triggerFile('itr_prev')">
+                <input type="file" id="file-itr_prev" accept=".json" onchange="fileSelected('itr_prev', this)">
+                <span class="remove-file-btn" onclick="removeFile('itr_prev',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📋</div>
+                <div class="file-zone-name">ITR 2023-24</div>
+                <div class="file-zone-sub" id="fname-itr_prev">Previous Year · .json</div>
+                <div class="file-zone-status" id="fstatus-itr_prev"></div>
+              </div>
+              <div class="file-zone" id="zone-itr_curr" onclick="triggerFile('itr_curr')">
+                <input type="file" id="file-itr_curr" accept=".json" onchange="fileSelected('itr_curr', this)">
+                <span class="remove-file-btn" onclick="removeFile('itr_curr',event)">✕</span>
+                <span class="file-zone-badge badge-req">Required</span>
+                <div class="file-zone-icon">📋</div>
+                <div class="file-zone-name">ITR 2024-25</div>
+                <div class="file-zone-sub" id="fname-itr_curr">Current Year · .json</div>
+                <div class="file-zone-status" id="fstatus-itr_curr"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Validation summary -->
+          <div id="validation-summary"></div>
+
+          <div class="wizard-actions">
+            <button class="btn btn-secondary" onclick="goToStep1()">← Back</button>
+            <button class="btn btn-primary btn-lg" onclick="goToStep3()">
+              Review & Calculate →
+            </button>
+            <button class="btn btn-warning" onclick="goToStep3(true)" id="btn-skip">
+              ⚠ Skip Missing & Continue
+            </button>
+          </div>
+        </div>
+
+        <!-- ─── STEP 3: Review & Calculate ──────────────────────────────── -->
+        <div id="wizard-step-3" style="display:none">
+          <div class="wizard-header">
+            <h2>Review & Calculate Health Score</h2>
+            <p>Confirm the uploaded files and calculate the health score for this client</p>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">👤 Client Summary</div>
+            <div class="form-grid">
+              <div>
+                <div style="font-size:12px;color:#64748b;font-weight:500">Client Name</div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-top:3px" id="review-name">—</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#64748b;font-weight:500">Industry</div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-top:3px;text-transform:capitalize" id="review-industry">—</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#64748b;font-weight:500">Turnover</div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-top:3px" id="review-turnover">—</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#64748b;font-weight:500">GSTIN</div>
+                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-top:3px" id="review-gstin">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">📁 Files Summary</div>
+            <div id="review-files-list"></div>
+          </div>
+
+          <div id="review-missing-warning"></div>
+
+          <div class="wizard-actions">
+            <button class="btn btn-secondary" onclick="goToStep2()">← Back</button>
+            <button class="btn btn-success btn-lg" id="btn-calculate" onclick="calculateScore()">
+              🔢 Calculate Health Score
+            </button>
+          </div>
+        </div>
+
+        <!-- ─── STEP 4: Results ──────────────────────────────────────────── -->
+        <div id="wizard-step-4" style="display:none">
+          <div class="result-container">
+            <div class="result-top">
+              <div class="score-circle-wrap">
+                <svg id="score-svg" width="150" height="150" viewBox="0 0 200 200">
+                  <circle cx="100" cy="100" r="82" fill="none" stroke="#e2e8f0" stroke-width="18"/>
+                  <circle id="score-arc" cx="100" cy="100" r="82" fill="none" stroke="#10b981" stroke-width="18"
+                    stroke-dasharray="515" stroke-dashoffset="515"
+                    stroke-linecap="round" transform="rotate(-90 100 100)"
+                    style="transition: stroke-dashoffset 1.2s ease, stroke 0.5s"/>
+                  <text id="score-num" x="100" y="93" text-anchor="middle" font-size="44" font-weight="800" fill="#0f172a"></text>
+                  <text x="100" y="120" text-anchor="middle" font-size="14" fill="#94a3b8">/100</text>
+                </svg>
+                <div class="score-label-badge" id="score-label-badge"></div>
+              </div>
+
+              <div class="client-score-info">
+                <h2 id="result-client-name">—</h2>
+                <div class="sub" id="result-sub">—</div>
+
+                <div class="component-grid" id="component-grid"></div>
+              </div>
+            </div>
+
+            <!-- Issues -->
+            <div class="issues-card" id="issues-card">
+              <h3>⚠ Key Issues Found</h3>
+              <div id="issues-list"></div>
+            </div>
+
+            <!-- Advisory -->
+            <div class="advisory-card">
+              <h3>💡 CA Advisory</h3>
+              <div class="advisory-text" id="advisory-text"></div>
+            </div>
+
+            <!-- Files processed -->
+            <div class="card" style="margin-bottom:20px">
+              <div class="card-header">
+                <div class="card-title">Files Processed</div>
+              </div>
+              <div style="padding:14px 16px">
+                <div class="files-summary" id="result-files-summary"></div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="result-actions">
+              <button class="btn btn-primary btn-lg" onclick="downloadReport()">
+                ⬇ Download PDF Report
+              </button>
+              <button class="btn btn-success btn-lg" onclick="resetWizard()">
+                + Score Next Client
+              </button>
+              <button class="btn btn-ghost" onclick="navigate('dashboard')">
+                View Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end page-upload -->
+
+    </div><!-- end content-area -->
+  </div><!-- end main-content -->
+</div><!-- end app -->
+
+<!-- ── Loading Overlay ──────────────────────────────────────────────────── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Calculating Health Score…</div>
+  <div class="loading-sub">Extracting data and running analysis</div>
+</div>
+
+<!-- ── Toast Container ──────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Sample Files Modal ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="sample-modal">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div class="modal-title">📁 Download Sample Test Files</div>
+        <div class="modal-sub">Use these sample files to test the upload flow</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeSampleModal()">✕ Close</button>
+    </div>
+    <div id="sample-files-list"></div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9">
+      <button class="btn btn-primary" onclick="downloadAllSamples()" style="width:100%">⬇ Download All Sample Files</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════════════════════════
+const state = {
+  currentPage: 'dashboard',
+  currentStep: 1,
+  partners: [],
+  selectedPartner: null,
+  uploadedFiles: {},   // key → File object
+  clientForm: {},
+  scoreResult: null,
+};
+
+const REQUIRED_FILES = ['gstr1_fy1','gstr3b_fy1','gstr2a_fy1','gstr1_fy2','gstr3b_fy2','gstr2a_fy2','itr_prev','itr_curr'];
+const OPTIONAL_FILES = ['banking_fy2'];
+const ALL_FILE_KEYS  = [...REQUIRED_FILES, ...OPTIONAL_FILES];
+
+const FILE_LABELS = {
+  gstr1_fy1:'GSTR-1 (2024-25)', gstr3b_fy1:'GSTR-3B (2024-25)', gstr2a_fy1:'GSTR-2A (2024-25)',
+  gstr1_fy2:'GSTR-1 (2025-26)', gstr3b_fy2:'GSTR-3B (2025-26)', gstr2a_fy2:'GSTR-2A (2025-26)',
+  banking_fy2:'Banking (2025-26)', itr_prev:'ITR 2023-24', itr_curr:'ITR 2024-25',
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('nav-' + page).classList.add('active');
+  state.currentPage = page;
+
+  const titles = { dashboard:'Dashboard', clients:'Clients', upload:'Upload & Score' };
+  document.getElementById('topbar-title').textContent = titles[page] || page;
+
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'clients') loadClients();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+const BASE = window.location.origin;
+
+async function apiFetch(path, opts = {}) {
+  try {
+    const r = await fetch(BASE + path, opts);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    return await r.json();
+  } catch (e) {
+    throw e;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTNER LOADING
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadPartners() {
+  try {
+    const partners = await apiFetch('/api/admin/partners');
+    state.partners = partners;
+
+    const sel = document.getElementById('partner-select');
+    sel.innerHTML = partners.length === 0
+      ? '<option value="">No partners found</option>'
+      : partners.map(p => `<option value="${p.id}">${p.name} (${p.firm_type || 'CA'})</option>`).join('');
+
+    if (partners.length > 0) {
+      state.selectedPartner = partners[0];
+      updatePartnerUI(partners[0]);
+    }
+  } catch (e) {
+    toast('Could not load partners: ' + e.message, 'error');
+  }
+}
+
+function onPartnerChange() {
+  const sel = document.getElementById('partner-select');
+  const p = state.partners.find(x => x.id === sel.value);
+  if (p) { state.selectedPartner = p; updatePartnerUI(p); }
+}
+
+function updatePartnerUI(p) {
+  document.getElementById('sidebar-partner-name').textContent = p.name;
+  document.getElementById('sidebar-partner-email').textContent = p.email;
+  document.getElementById('sidebar-credits').textContent = p.credits_balance;
+  document.getElementById('stat-credits').textContent = p.credits_balance;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const [stats, reports, dist] = await Promise.all([
+      apiFetch('/api/admin/stats'),
+      apiFetch('/api/admin/reports?per_page=10'),
+      apiFetch('/api/admin/scores/distribution'),
+    ]);
+
+    document.getElementById('stat-clients').textContent = stats.total_clients;
+    document.getElementById('stat-reports').textContent = stats.total_reports;
+    document.getElementById('stat-avg').textContent = stats.avg_health_score ? stats.avg_health_score.toFixed(1) : '—';
+
+    renderRecentReports(reports.items || []);
+    renderDistChart(dist.distribution || []);
+  } catch (e) {
+    toast('Dashboard load error: ' + e.message, 'error');
+  }
+}
+
+function scoreClass(s) {
+  if (s >= 76) return 'score-healthy';
+  if (s >= 51) return 'score-moderate';
+  if (s >= 26) return 'score-atrisk';
+  return 'score-critical';
+}
+function scoreLabel(s) {
+  if (s >= 76) return 'Healthy';
+  if (s >= 51) return 'Moderate';
+  if (s >= 26) return 'At Risk';
+  return 'Critical';
+}
+
+function renderRecentReports(items) {
+  const tbody = document.getElementById('recent-reports-table');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📋</div><h3>No reports yet</h3><p>Upload files for a client to generate the first health score</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(r => `
+    <tr>
+      <td style="font-weight:600">${r.client_name}</td>
+      <td style="color:#64748b;text-transform:capitalize">${r.partner_name || '—'}</td>
+      <td>
+        <span style="font-size:16px;font-weight:800;color:#0f172a">${r.total_score.toFixed(0)}</span>
+        <span style="font-size:11px;color:#94a3b8">/100</span>
+      </td>
+      <td><span class="score-pill ${scoreClass(r.total_score)}">${scoreLabel(r.total_score)}</span></td>
+      <td style="color:#64748b">${new Date(r.score_date).toLocaleDateString('en-IN')}</td>
+      <td></td>
+    </tr>`).join('');
+}
+
+function renderDistChart(dist) {
+  const el = document.getElementById('dist-chart');
+  if (!dist.length) return;
+  const max = Math.max(...dist.map(d => d.count), 1);
+  const colors = ['#ef4444','#f97316','#f59e0b','#84cc16','#10b981'];
+  el.innerHTML = dist.map((d, i) => `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+      <div style="font-size:12px;font-weight:700;color:#334155">${d.count}</div>
+      <div style="width:100%;background:${colors[i]};border-radius:4px 4px 0 0;height:${Math.max((d.count/max)*80,d.count>0?8:2)}px;transition:height 0.5s"></div>
+      <div style="font-size:11px;color:#64748b">${d.range}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLIENTS
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadClients() {
+  try {
+    const pid = state.selectedPartner?.id || '';
+    const data = await apiFetch(`/api/v1/clients?per_page=50${pid ? '&partner_id='+pid : ''}`);
+    renderClientsTable(data.items || []);
+  } catch (e) {
+    toast('Could not load clients: ' + e.message, 'error');
+  }
+}
+
+function renderClientsTable(items) {
+  const tbody = document.getElementById('clients-table');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">🏢</div><h3>No clients yet</h3><p>Click "Score New Client" to add your first MSME client</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(c => `
+    <tr>
+      <td style="font-weight:600">${c.business_name || c.name}</td>
+      <td style="text-transform:capitalize;color:#64748b">${c.industry || '—'}</td>
+      <td style="font-family:monospace;font-size:12px;color:#64748b">${c.gstin || '—'}</td>
+      <td>—</td>
+      <td style="color:#64748b">${c.latest_data_date ? new Date(c.latest_data_date).toLocaleDateString('en-IN') : '—'}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="scoreExisting('${c.id}')">Re-score</button></td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WIZARD — STEP NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════
+function setStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById(`wizard-step-${i}`);
+    if (el) el.style.display = i === n ? 'block' : 'none';
+  }
+  state.currentStep = n;
+  updateStepIndicator(n);
+}
+
+function updateStepIndicator(active) {
+  for (let i = 1; i <= 3; i++) {
+    const circle = document.getElementById(`sc-${i}`);
+    const label  = document.getElementById(`sl-${i}`);
+    const line   = document.getElementById(`sline-${i}`);
+    circle.className = 'step-circle ' + (i < active ? 'done' : i === active ? 'active' : '');
+    label.className  = 'step-label '  + (i < active ? 'done' : i === active ? 'active' : '');
+    circle.textContent = i < active ? '✓' : i;
+    if (line) line.className = 'step-line ' + (i < active ? 'done' : '');
+  }
+}
+
+function goToStep1() { setStep(1); }
+
+function goToStep2() {
+  const name = document.getElementById('f-client-name').value.trim();
+  const turnover = document.getElementById('f-turnover').value;
+
+  let ok = true;
+  if (!name) {
+    document.getElementById('err-client-name').textContent = 'Business name is required';
+    ok = false;
+  } else { document.getElementById('err-client-name').textContent = ''; }
+
+  if (!turnover || parseFloat(turnover) <= 0) {
+    document.getElementById('err-turnover').textContent = 'Enter a valid turnover amount';
+    ok = false;
+  } else { document.getElementById('err-turnover').textContent = ''; }
+
+  if (!ok) return;
+
+  state.clientForm = {
+    name:     name,
+    industry: document.getElementById('f-industry').value,
+    turnover: parseFloat(turnover),
+    gstin:    document.getElementById('f-gstin').value.trim(),
+  };
+  setStep(2);
+  updateValidationSummary();
+}
+
+function goToStep3(skipMissing = false) {
+  const missing = REQUIRED_FILES.filter(k => !state.uploadedFiles[k]);
+  if (!skipMissing && missing.length > 0) {
+    updateValidationSummary(true);
+    return;
+  }
+  renderReviewStep();
+  setStep(3);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FILE HANDLING
+// ═══════════════════════════════════════════════════════════════════════════
+function triggerFile(key) {
+  document.getElementById('file-' + key).click();
+}
+
+function fileSelected(key, input) {
+  if (!input.files || !input.files[0]) return;
+  const f = input.files[0];
+  state.uploadedFiles[key] = f;
+
+  const zone = document.getElementById('zone-' + key);
+  zone.classList.add('has-file');
+  zone.classList.remove('required-missing');
+  document.getElementById('fname-' + key).textContent = f.name;
+  document.getElementById('fstatus-' + key).textContent = '✓ Ready';
+
+  updateValidationSummary();
+}
+
+function removeFile(key, evt) {
+  evt.stopPropagation();
+  delete state.uploadedFiles[key];
+  const zone = document.getElementById('zone-' + key);
+  zone.classList.remove('has-file');
+  document.getElementById('file-' + key).value = '';
+
+  const isReq = REQUIRED_FILES.includes(key);
+  document.getElementById('fname-' + key).textContent =
+    zone.querySelector('.file-zone-name').textContent + ' · ' + (key === 'banking_fy2' ? '.csv' : '.json');
+  document.getElementById('fstatus-' + key).textContent = '';
+
+  updateValidationSummary();
+}
+
+function updateValidationSummary(highlightMissing = false) {
+  const missing = REQUIRED_FILES.filter(k => !state.uploadedFiles[k]);
+  const uploaded = ALL_FILE_KEYS.filter(k => state.uploadedFiles[k]);
+  const el = document.getElementById('validation-summary');
+  const skipBtn = document.getElementById('btn-skip');
+
+  if (missing.length === 0) {
+    el.innerHTML = `
+      <div class="missing-alert success">
+        <div class="missing-alert-icon">✅</div>
+        <div class="missing-alert-body">
+          <div class="missing-alert-title">All required files uploaded (${uploaded.length} files total)</div>
+        </div>
+      </div>`;
+    skipBtn.style.display = 'none';
+  } else {
+    if (highlightMissing) missing.forEach(k => document.getElementById('zone-' + k)?.classList.add('required-missing'));
+    el.innerHTML = `
+      <div class="missing-alert ${highlightMissing ? 'error' : 'warn'}">
+        <div class="missing-alert-icon">⚠</div>
+        <div class="missing-alert-body">
+          <div class="missing-alert-title">${missing.length} required file${missing.length > 1 ? 's' : ''} missing
+            ${uploaded.length > 0 ? ` · ${uploaded.length} uploaded` : ''}</div>
+          <ul class="missing-alert-list">
+            ${missing.map(k => `<li>${FILE_LABELS[k]}</li>`).join('')}
+          </ul>
+        </div>
+      </div>`;
+    skipBtn.style.display = uploaded.length > 0 ? 'inline-flex' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STEP 3 — REVIEW
+// ═══════════════════════════════════════════════════════════════════════════
+function renderReviewStep() {
+  const cf = state.clientForm;
+  document.getElementById('review-name').textContent = cf.name;
+  document.getElementById('review-industry').textContent = cf.industry;
+  document.getElementById('review-turnover').textContent = '₹ ' + Number(cf.turnover).toLocaleString('en-IN');
+  document.getElementById('review-gstin').textContent = cf.gstin || '—';
+
+  const uploaded = ALL_FILE_KEYS.filter(k => state.uploadedFiles[k]);
+  const missing  = REQUIRED_FILES.filter(k => !state.uploadedFiles[k]);
+
+  const listEl = document.getElementById('review-files-list');
+  listEl.innerHTML = `
+    <div class="files-summary">
+      ${ALL_FILE_KEYS.map(k => {
+        const hasFile = !!state.uploadedFiles[k];
+        const isOpt = OPTIONAL_FILES.includes(k);
+        return `<span class="file-tag ${hasFile ? 'ok' : (isOpt ? '' : 'missing')}"
+          style="${!hasFile && isOpt ? 'background:#f1f5f9;color:#94a3b8' : ''}">
+          ${hasFile ? '✓' : (isOpt ? '—' : '✗')} ${FILE_LABELS[k]}
+        </span>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:#64748b">
+      ${uploaded.length} files ready · ${missing.length} required files missing
+    </div>`;
+
+  const warnEl = document.getElementById('review-missing-warning');
+  if (missing.length > 0) {
+    warnEl.innerHTML = `
+      <div class="missing-alert warn" style="margin-bottom:16px">
+        <div class="missing-alert-icon">⚠</div>
+        <div class="missing-alert-body">
+          <div class="missing-alert-title">Proceeding with partial data — score may be lower</div>
+          <div style="font-size:12px;color:#92400e;margin-top:4px">
+            Missing: ${missing.map(k => FILE_LABELS[k]).join(', ')}
+          </div>
+        </div>
+      </div>`;
+  } else {
+    warnEl.innerHTML = '';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCORE CALCULATION
+// ═══════════════════════════════════════════════════════════════════════════
+async function calculateScore() {
+  if (!state.selectedPartner) {
+    toast('Select a partner first', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-calculate');
+  btn.disabled = true;
+  btn.textContent = 'Calculating…';
+  document.getElementById('loading-overlay').classList.add('show');
+
+  try {
+    const fd = new FormData();
+    const cf = state.clientForm;
+    fd.append('client_name', cf.name);
+    fd.append('industry', cf.industry);
+    fd.append('turnover', cf.turnover);
+    fd.append('gstin', cf.gstin || '');
+    fd.append('partner_id', state.selectedPartner.id);
+
+    // Append all files
+    for (const key of ALL_FILE_KEYS) {
+      if (state.uploadedFiles[key]) {
+        fd.append(key, state.uploadedFiles[key], state.uploadedFiles[key].name);
+      }
+    }
+
+    const result = await fetch(BASE + '/api/v1/upload-and-score', {
+      method: 'POST', body: fd,
+    });
+
+    if (!result.ok) {
+      const err = await result.json().catch(() => ({ detail: result.statusText }));
+      throw new Error(err.detail || `HTTP ${result.status}`);
+    }
+
+    const data = await result.json();
+    state.scoreResult = data;
+
+    // Update credits in sidebar
+    document.getElementById('sidebar-credits').textContent = data.credits_remaining;
+    document.getElementById('stat-credits').textContent = data.credits_remaining;
+    if (state.selectedPartner) state.selectedPartner.credits_balance = data.credits_remaining;
+
+    renderResults(data);
+    setStep(4);
+    toast(`Score calculated: ${data.health_score}/100 (${data.score_label})`, 'success');
+
+  } catch (e) {
+    toast('Calculation failed: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🔢 Calculate Health Score';
+  } finally {
+    document.getElementById('loading-overlay').classList.remove('show');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER RESULTS
+// ═══════════════════════════════════════════════════════════════════════════
+function renderResults(data) {
+  // Score circle
+  const circumference = 2 * Math.PI * 82;
+  const offset = circumference * (1 - data.health_score / 100);
+  const arc = document.getElementById('score-arc');
+  arc.style.strokeDasharray = circumference;
+  arc.style.strokeDashoffset = circumference; // start at 0
+  arc.style.stroke = data.score_color;
+  setTimeout(() => { arc.style.strokeDashoffset = offset; }, 100);
+
+  document.getElementById('score-num').textContent = Math.round(data.health_score);
+  document.getElementById('score-num').setAttribute('fill', data.score_color);
+
+  const badge = document.getElementById('score-label-badge');
+  badge.textContent = data.score_label;
+  badge.style.background = data.score_color + '22';
+  badge.style.color = data.score_color;
+
+  // Client info
+  document.getElementById('result-client-name').textContent = data.client_name;
+  document.getElementById('result-sub').textContent =
+    `${data.files_processed} files processed · ${Math.round(data.data_completeness_pct)}% data completeness`;
+
+  // Component bars
+  const grid = document.getElementById('component-grid');
+  const components = data.score_components;
+  grid.innerHTML = Object.entries(components).map(([name, val]) => {
+    const pct = (val / 25) * 100;
+    let barColor = '#1d4ed8';
+    if (pct >= 80) barColor = '#10b981';
+    else if (pct >= 50) barColor = '#f59e0b';
+    else barColor = '#ef4444';
+    return `
+      <div class="component-item">
+        <div class="component-name">${name}</div>
+        <div class="component-bar-wrap">
+          <div class="component-bar">
+            <div class="component-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+          </div>
+          <div class="component-val">${val}/25</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Issues
+  const issuesList = document.getElementById('issues-list');
+  const issuesCard = document.getElementById('issues-card');
+  if (data.issues && data.issues.length > 0) {
+    issuesList.innerHTML = data.issues.map(issue => `
+      <div class="issue-item">
+        <div class="issue-dot"></div>
+        <div class="issue-text">${issue}</div>
+      </div>`).join('');
+    issuesCard.style.display = 'block';
+  } else {
+    issuesCard.style.display = 'none';
+  }
+
+  // Advisory
+  document.getElementById('advisory-text').textContent = data.advisory;
+
+  // Files summary
+  const fsum = document.getElementById('result-files-summary');
+  fsum.innerHTML = [
+    ...ALL_FILE_KEYS.filter(k => state.uploadedFiles[k]).map(k =>
+      `<span class="file-tag ok">✓ ${FILE_LABELS[k]}</span>`),
+    ...(data.files_missing || []).map(m =>
+      `<span class="file-tag missing">✗ ${m}</span>`),
+  ].join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PDF REPORT
+// ═══════════════════════════════════════════════════════════════════════════
+function downloadReport() {
+  const d = state.scoreResult;
+  if (!d) return;
+
+  const scoreColor = d.score_color;
+  const now = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' });
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Vertibis Health Report — ${d.client_name}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; color: #1e293b; padding: 40px; max-width: 800px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 2px solid #1d4ed8; margin-bottom: 24px; }
+  .brand { font-size: 22px; font-weight: 800; color: #1d4ed8; }
+  .brand-sub { font-size: 12px; color: #64748b; margin-top: 3px; }
+  .report-meta { text-align: right; font-size: 12px; color: #64748b; }
+  .score-section { display: flex; align-items: center; gap: 32px; background: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #e2e8f0; }
+  .score-big { font-size: 72px; font-weight: 900; color: ${scoreColor}; line-height: 1; }
+  .score-label { font-size: 16px; font-weight: 800; color: ${scoreColor}; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .score-meta { font-size: 13px; color: #64748b; margin-top: 6px; }
+  .client-name { font-size: 22px; font-weight: 800; color: #0f172a; }
+  .section-title { font-size: 14px; font-weight: 700; color: #0f172a; margin: 20px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
+  .components { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .comp-item { background: #f8fafc; border-radius: 8px; padding: 12px; }
+  .comp-name { font-size: 11px; color: #64748b; font-weight: 500; text-transform: uppercase; }
+  .comp-val { font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 2px; }
+  .comp-sub { font-size: 11px; color: #94a3b8; }
+  .issue-item { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .advisory { background: #eff6ff; border-left: 4px solid #1d4ed8; padding: 16px; border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.7; white-space: pre-line; }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+  @media print { body { padding: 24px; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div><div class="brand">⚡ Vertibis</div><div class="brand-sub">MSME Business Health Scoring</div></div>
+    <div class="report-meta"><div><strong>Report Date:</strong> ${now}</div><div style="margin-top:3px"><strong>Report ID:</strong> ${d.score_id.substring(0,8).toUpperCase()}</div></div>
+  </div>
+
+  <div class="score-section">
+    <div>
+      <div class="score-big">${Math.round(d.health_score)}</div>
+      <div style="font-size:18px;color:#64748b;font-weight:500">/100</div>
+    </div>
+    <div>
+      <div class="client-name">${d.client_name}</div>
+      <div class="score-label" style="margin-top:8px">${d.score_label}</div>
+      <div class="score-meta">${d.files_processed} documents analysed · ${Math.round(d.data_completeness_pct)}% data completeness</div>
+    </div>
+  </div>
+
+  <div class="section-title">Score Breakdown</div>
+  <div class="components">
+    ${Object.entries(d.score_components).map(([name, val]) => `
+      <div class="comp-item">
+        <div class="comp-name">${name}</div>
+        <div class="comp-val">${val}<span style="font-size:13px;color:#94a3b8;font-weight:400">/25</span></div>
+        <div class="comp-sub">${Math.round((val/25)*100)}% of maximum</div>
+      </div>`).join('')}
+  </div>
+
+  ${d.issues && d.issues.length > 0 ? `
+  <div class="section-title">Issues Identified</div>
+  ${d.issues.map(i => `<div class="issue-item"><span>•</span><span>${i}</span></div>`).join('')}
+  ` : ''}
+
+  <div class="section-title">CA Advisory</div>
+  <div class="advisory">${d.advisory}</div>
+
+  <div class="footer">
+    Generated by Vertibis — Confidential MSME Health Report — ${now}
+  </div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RESET WIZARD
+// ═══════════════════════════════════════════════════════════════════════════
+function resetWizard() {
+  state.uploadedFiles = {};
+  state.clientForm = {};
+  state.scoreResult = null;
+
+  // Clear form
+  document.getElementById('f-client-name').value = '';
+  document.getElementById('f-gstin').value = '';
+  document.getElementById('f-turnover').value = '';
+  document.getElementById('f-industry').value = 'trading';
+  document.getElementById('err-client-name').textContent = '';
+  document.getElementById('err-turnover').textContent = '';
+  document.getElementById('validation-summary').innerHTML = '';
+
+  // Reset all file zones
+  ALL_FILE_KEYS.forEach(key => {
+    const zone = document.getElementById('zone-' + key);
+    if (zone) {
+      zone.classList.remove('has-file', 'required-missing');
+      document.getElementById('fname-' + key).textContent =
+        zone.querySelector('.file-zone-name').textContent + ' · ' + (key === 'banking_fy2' ? '.csv' : '.json');
+      document.getElementById('fstatus-' + key).textContent = '';
+    }
+    const input = document.getElementById('file-' + key);
+    if (input) input.value = '';
+  });
+
+  setStep(1);
+  navigate('upload');
+}
+
+function scoreExisting(clientId) {
+  navigate('upload');
+  toast('For re-scoring, use the Upload & Score wizard and create a new entry', 'warn');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAMPLE FILES
+// ═══════════════════════════════════════════════════════════════════════════
+const SAMPLE_FILES = {
+  'gstr1_sample.json': {
+    desc: 'GSTR-1 Outward Supplies',
+    content: JSON.stringify({
+      filing_date: "2025-04-20",
+      total_taxable_supplies: 6200000,
+      total_itc_claimed: 4500000,
+      amendments_count: 1
+    }, null, 2)
+  },
+  'gstr3b_sample.json': {
+    desc: 'GSTR-3B Summary Return',
+    content: JSON.stringify({
+      filing_date: "2025-04-22",
+      total_sales: 6000000,
+      total_itc_availed: 4200000,
+      gst_payment: 240000
+    }, null, 2)
+  },
+  'gstr2a_sample.json': {
+    desc: 'GSTR-2A ITC Details',
+    content: JSON.stringify({
+      supplier_count: 45,
+      itc_received: 4200000,
+      discrepancies_count: 1
+    }, null, 2)
+  },
+  'itr_sample.json': {
+    desc: 'Income Tax Return',
+    content: JSON.stringify({
+      filing_date: "2024-07-15",
+      total_turnover: 5500000,
+      net_profit: 550000,
+      profit_margin_pct: 10.0
+    }, null, 2)
+  },
+  'banking_sample.csv': {
+    desc: 'Bank Statement',
+    content: 'date,balance,bounce_count\n2024-04-01,500000,0\n2024-05-01,620000,0\n2024-06-01,580000,1\n2024-07-01,710000,0\n2024-08-01,690000,0\n2024-09-01,750000,0'
+  },
+};
+
+function showSampleFilesModal() {
+  const list = document.getElementById('sample-files-list');
+  list.innerHTML = Object.entries(SAMPLE_FILES).map(([name, f]) => `
+    <div class="sample-file-item">
+      <div>
+        <div class="sample-file-name">📄 ${name}</div>
+        <div class="sample-file-desc">${f.desc}</div>
+      </div>
+      <button class="btn btn-sm btn-secondary" onclick="downloadSample('${name}')">⬇ Download</button>
+    </div>`).join('');
+  document.getElementById('sample-modal').classList.add('show');
+}
+
+function closeSampleModal() {
+  document.getElementById('sample-modal').classList.remove('show');
+}
+
+function downloadSample(name) {
+  const f = SAMPLE_FILES[name];
+  const blob = new Blob([f.content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+}
+
+function downloadAllSamples() {
+  Object.keys(SAMPLE_FILES).forEach((name, i) => {
+    setTimeout(() => downloadSample(name), i * 150);
+  });
+  toast('Downloading all sample files…', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════════════
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icons = { success:'✅', error:'❌', warn:'⚠️', info:'ℹ️' };
+  el.innerHTML = `<span>${icons[type] || '•'}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+(async function init() {
+  await loadPartners();
+  await loadDashboard();
+  setStep(1);
+})();
+</script>
+</body>
+</html>
