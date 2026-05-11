@@ -10,8 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.email_service import send_partner_registration_emails
 from app.models import Partner
-from app.schemas import AuthResponse, AuthUserOut, LoginRequest, PartnerRegisterRequest
+from app.schemas import AuthResponse, AuthUserOut, LoginRequest, PartnerRegisterRequest, RegisterPendingResponse
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -76,7 +77,7 @@ def _auth_response(partner: Partner) -> AuthResponse:
     )
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterPendingResponse, status_code=status.HTTP_201_CREATED)
 def register_partner(payload: PartnerRegisterRequest, db: Session = Depends(get_db)):
     if payload.role and payload.role != "ca_partner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized partner access")
@@ -96,13 +97,27 @@ def register_partner(payload: PartnerRegisterRequest, db: Session = Depends(get_
         password_hash=_hash_password(payload.password),
         role="ca_partner",
         credits_balance=50,
-        status="active",
+        status="pending",
     )
     db.add(partner)
     db.commit()
     db.refresh(partner)
 
-    return _auth_response(partner)
+    send_partner_registration_emails(partner)
+
+    return RegisterPendingResponse(
+        message="Registration submitted for approval",
+        user=AuthUserOut(
+            id=partner.id,
+            name=partner.contact_name or partner.name,
+            email=partner.email,
+            role=partner.role or "ca_partner",
+            firm_name=partner.name,
+            profession=partner.profession or partner.firm_type,
+            phone=partner.phone,
+            membership_no=partner.membership_no,
+        ),
+    )
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -113,5 +128,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     if (partner.role or "ca_partner") != "ca_partner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized partner access")
+
+    if partner.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your partner account is pending approval")
 
     return _auth_response(partner)

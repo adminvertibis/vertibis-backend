@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.email_service import send_partner_approval_email
 from app.models import Partner
 from app.schemas import PartnerCreate, PartnerUpdate, PartnerOut
 
@@ -55,9 +56,15 @@ def update_partner(
     if not partner:
         raise HTTPException(status_code=404, detail="Partner not found")
 
+    previous_status = partner.status
+
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(partner, field, value)
 
     db.commit()
     db.refresh(partner)
+
+    if previous_status != "active" and partner.status == "active":
+        send_partner_approval_email(partner)
+
     return partner

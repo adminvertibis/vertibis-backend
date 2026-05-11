@@ -76,6 +76,11 @@ class AuthResponse(BaseModel):
     user: AuthUserOut
 
 
+class RegisterPendingResponse(BaseModel):
+    message: str
+    user: AuthUserOut
+
+
 # ─── Client schemas ───────────────────────────────────────────────────────────
 
 class ClientCreate(BaseModel):
