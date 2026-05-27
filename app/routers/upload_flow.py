@@ -13,10 +13,11 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import Client, FileUpload, DataPoint, HealthScore, Partner, CreditTransaction
+from app.models import Client, FileUpload, DataPoint, HealthScore, Partner
 from app.extractors import DataExtractor
 from app.scoring_engine import ScoringEngine
 from app.advisory_generator import AdvisoryGenerator
+from app.pricing_config import get_credit_rule, get_size_band
 
 router = APIRouter(prefix="/api/v1", tags=["Upload Wizard"])
 
@@ -186,9 +187,6 @@ async def upload_and_score(
     partner = db.get(Partner, pid)
     if not partner:
         raise HTTPException(status_code=404, detail="Partner not found")
-    if partner.credits_balance < 1:
-        raise HTTPException(status_code=402, detail="Insufficient credits")
-
     # ── Create client ─────────────────────────────────────────────────────────
     client = Client(
         partner_id=pid,
@@ -268,9 +266,20 @@ async def upload_and_score(
     advisory = AdvisoryGenerator.generate_advisory(merged, scores, industry, client_name)
 
     components = scores.get("components", {})
+    size_band = get_size_band(None, eff_turnover)
+    rule = get_credit_rule("detailed_2y", size_band.name if size_band else None, eff_turnover)
     hs = HealthScore(
         client_id=client.id,
         total_score=scores["total_score"],
+        report_type="detailed_2y",
+        report_variant="Detailed 2-Year Trend Report",
+        turnover_band=size_band.name if size_band else None,
+        client_size_band=size_band.name if size_band else None,
+        credits_required=int(rule.credits_required or 0) if rule and rule.credits_required is not None else 0,
+        credits_used=0,
+        suggested_fee_min=rule.suggested_fee_min if rule else None,
+        suggested_fee_max=rule.suggested_fee_max if rule else None,
+        report_status="locked",
         gst_integrity_score=components.get("gst_itc_score"),
         compliance_behaviour_score=components.get("filing_score"),
         cashflow_health_score=components.get("cashflow_score"),
@@ -283,15 +292,6 @@ async def upload_and_score(
     db.add(hs)
 
     # ── Deduct credit ─────────────────────────────────────────────────────────
-    partner.credits_balance -= 1
-    db.add(CreditTransaction(
-        partner_id=pid,
-        transaction_type="usage",
-        credits_amount=-1,
-        related_client_id=client.id,
-        description=f"Score: {client_name}",
-    ))
-
     client.latest_data_date = datetime.utcnow()
     client.latest_data_source = "manual_upload"
     db.commit()

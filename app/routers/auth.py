@@ -6,9 +6,10 @@ import os
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth_utils import get_jwt_secret
 from app.database import get_db
 from app.email_service import send_partner_registration_emails
 from app.models import Partner
@@ -44,7 +45,7 @@ def _b64url(data: bytes) -> str:
 
 
 def _create_access_token(partner: Partner) -> str:
-    secret = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY") or "change-me-in-production"
+    secret = get_jwt_secret()
     now = datetime.utcnow()
     expires = now + timedelta(hours=int(os.getenv("JWT_EXPIRE_HOURS", "24")))
     header = {"alg": "HS256", "typ": "JWT"}
@@ -65,7 +66,7 @@ def _auth_response(partner: Partner) -> AuthResponse:
     return AuthResponse(
         access_token=_create_access_token(partner),
         user=AuthUserOut(
-            id=partner.id,
+            id=str(partner.id),
             name=partner.contact_name or partner.name,
             email=partner.email,
             role=partner.role or "ca_partner",
@@ -77,8 +78,36 @@ def _auth_response(partner: Partner) -> AuthResponse:
     )
 
 
+def _admin_auth_response(payload: LoginRequest) -> AuthResponse | None:
+    admin_email = os.getenv("ADMIN_EMAIL", "admin@vertibis.in").lower()
+    if payload.email.lower() != admin_email:
+        return None
+
+    admin_password = os.getenv("ADMIN_PASSWORD")
+    admin_api_key = os.getenv("ADMIN_API_KEY")
+    if not admin_password or not admin_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin credentials are not configured",
+        )
+
+    if not hmac.compare_digest(payload.password, admin_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    return AuthResponse(
+        access_token=admin_api_key,
+        user=AuthUserOut(
+            id="admin",
+            name="Vertibis Admin",
+            email=admin_email,
+            role="admin",
+            firm_name="Vertibis",
+        ),
+    )
+
+
 @router.post("/register", response_model=RegisterPendingResponse, status_code=status.HTTP_201_CREATED)
-def register_partner(payload: PartnerRegisterRequest, db: Session = Depends(get_db)):
+def register_partner(payload: PartnerRegisterRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if payload.role and payload.role != "ca_partner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized partner access")
 
@@ -103,12 +132,12 @@ def register_partner(payload: PartnerRegisterRequest, db: Session = Depends(get_
     db.commit()
     db.refresh(partner)
 
-    send_partner_registration_emails(partner)
+    background_tasks.add_task(send_partner_registration_emails, partner)
 
     return RegisterPendingResponse(
         message="Registration submitted for approval",
         user=AuthUserOut(
-            id=partner.id,
+            id=str(partner.id),
             name=partner.contact_name or partner.name,
             email=partner.email,
             role=partner.role or "ca_partner",
@@ -120,8 +149,20 @@ def register_partner(payload: PartnerRegisterRequest, db: Session = Depends(get_
     )
 
 
+@router.post("/admin/login")
+def login_admin(payload: LoginRequest):
+    response = _admin_auth_response(payload)
+    if response is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    return response
+
+
 @router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    admin_response = _admin_auth_response(payload)
+    if admin_response is not None:
+        return admin_response
+
     partner = db.query(Partner).filter(Partner.email == payload.email.lower()).first()
     if not partner or not _verify_password(payload.password, partner.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")

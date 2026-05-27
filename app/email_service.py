@@ -83,3 +83,20 @@ def send_partner_approval_email(partner) -> None:
             "Regards,\nVertibis Team"
         ),
     )
+
+
+def send_client_consent_email(client, partner, consent_url: str) -> bool:
+    return send_email(
+        client.email,
+        "Consent required for Vertibis MSME health report",
+        (
+            f"Hi {client.name},\n\n"
+            f"{partner.name} has requested your consent to process GST, income tax, and banking data "
+            "for generating your Vertibis MSME Business Health Report.\n\n"
+            "Please review and accept consent here:\n"
+            f"{consent_url}\n\n"
+            "This consent allows Vertibis to process only the data required for health scoring, "
+            "advisory insights, and report generation. You may contact your advisor for any clarification.\n\n"
+            "Regards,\nVertibis Team"
+        ),
+    )

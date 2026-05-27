@@ -3,11 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.database import create_tables
-from app.routers import auth, partners, clients, uploads, scores, admin, upload_flow
+from app.database import create_tables, ensure_runtime_schema
+from app.routers import auth, partners, clients, uploads, scores, admin, upload_flow, dashboard, reports
 from app.extractors import DataExtractor
 from app.scoring_engine import ScoringEngine
 from app.advisory_generator import AdvisoryGenerator
+
+import os
 
 app = FastAPI(
     title="Vertibis API",
@@ -15,25 +17,31 @@ app = FastAPI(
     version="2.0.0",
 )
 
+allowed_origins = [origin.strip() for origin in os.getenv(
+    "CORS_ORIGINS",
+    "https://admin.vertibis.com,https://partner.vertibis.com,https://vertibis.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002",
+).split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(partners.router)
 app.include_router(auth.router)
+app.include_router(dashboard.router)
 app.include_router(clients.router)
 app.include_router(uploads.router)
 app.include_router(scores.router)
+app.include_router(reports.router)
 app.include_router(admin.router)
 app.include_router(upload_flow.router)
 
 # ── Static files ──────────────────────────────────────────────────────────────
-import os
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -41,6 +49,7 @@ if os.path.isdir("static"):
 @app.on_event("startup")
 def on_startup():
     create_tables()
+    ensure_runtime_schema()
 
 
 # ── Utility endpoints ─────────────────────────────────────────────────────────

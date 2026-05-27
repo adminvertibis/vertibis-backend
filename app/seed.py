@@ -4,10 +4,18 @@ Run from project root: python -m app.seed
 """
 import sys
 import os
+import hashlib
+import secrets
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import SessionLocal, create_tables
 from app.models import Partner, Client
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 150_000)
+    return f"pbkdf2_sha256$150000${salt}${digest.hex()}"
 
 
 def seed():
@@ -24,6 +32,8 @@ def seed():
             phone="9876543210",
             firm_type="CA",
             gstin="27ABCDE1234F1Z5",
+            password_hash=hash_password("Partner@123"),
+            role="ca_partner",
             credits_balance=500,
             status="active",
         )

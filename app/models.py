@@ -42,6 +42,8 @@ class Partner(Base):
 
     credits_balance: Mapped[int] = mapped_column(Integer, default=100)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    plan: Mapped[str] = mapped_column(String(30), default="starter")
+    client_limit_override: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -64,7 +66,14 @@ class Client(Base):
     partner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("partners.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     gstin: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
+    consent_status: Mapped[str] = mapped_column(String(20), default="pending")
+    consent_token: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    consent_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    consent_signed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    consent_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     industry: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     turnover: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
@@ -157,6 +166,20 @@ class HealthScore(Base):
     score_date: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     total_score: Mapped[float] = mapped_column(Float, nullable=False)
+    report_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    report_type: Mapped[str] = mapped_column(String(30), default="quick")
+    report_variant: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    turnover_band: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    client_size_band: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    report_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    credits_required: Mapped[int] = mapped_column(Integer, default=0)
+    credits_used: Mapped[int] = mapped_column(Integer, default=0)
+    suggested_fee_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    suggested_fee_max: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    scoring_version: Mapped[str] = mapped_column(String(20), default="V2.0")
+    scoring_profile: Mapped[str] = mapped_column(String(30), default="core")
+    branding_mode: Mapped[str] = mapped_column(String(30), default="co_branded")
+    report_status: Mapped[str] = mapped_column(String(30), default="locked")
 
     gst_integrity_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     itr_consistency_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -171,6 +194,9 @@ class HealthScore(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    unlocked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    downloaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    shared_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     client: Mapped["Client"] = relationship("Client", back_populates="health_scores")
 
@@ -239,11 +265,14 @@ class CreditTransaction(Base):
 
     transaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
     credits_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    balance_after: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     related_client_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=True)
     related_health_score_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("health_scores.id"), nullable=True)
 
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    remarks: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="completed")
 
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=_now)

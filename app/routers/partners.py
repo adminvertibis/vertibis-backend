@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth_utils import require_admin
 from app.database import get_db
 from app.email_service import send_partner_approval_email
 from app.models import Partner
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/api/admin/partners", tags=["Partners"])
 
 @router.post("", response_model=PartnerOut, status_code=status.HTTP_201_CREATED,
              summary="Create a new CA/CS partner")
-def create_partner(payload: PartnerCreate, db: Session = Depends(get_db)):
+def create_partner(payload: PartnerCreate, db: Session = Depends(get_db), admin: None = Depends(require_admin)):
     existing = db.query(Partner).filter(Partner.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -31,6 +32,7 @@ def list_partners(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
+    admin: None = Depends(require_admin),
 ):
     q = db.query(Partner)
     if status:
@@ -39,7 +41,7 @@ def list_partners(
 
 
 @router.get("/{partner_id}", response_model=PartnerOut, summary="Get a partner by ID")
-def get_partner(partner_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_partner(partner_id: uuid.UUID, db: Session = Depends(get_db), admin: None = Depends(require_admin)):
     partner = db.get(Partner, partner_id)
     if not partner:
         raise HTTPException(status_code=404, detail="Partner not found")
@@ -51,6 +53,7 @@ def update_partner(
     partner_id: uuid.UUID,
     payload: PartnerUpdate,
     db: Session = Depends(get_db),
+    admin: None = Depends(require_admin),
 ):
     partner = db.get(Partner, partner_id)
     if not partner:
