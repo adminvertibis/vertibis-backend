@@ -211,8 +211,8 @@ class DataExtractor:
     @staticmethod
     def _calculate_completeness(data: Dict[str, Any]) -> float:
         checks = [
-            ("GST sales/API signal", any(data.get(field) for field in ("gstr1_total_sales", "gstr3b_total_sales", "ewb_total_invoice_value"))),
-            ("GST filing/API status", any(data.get(field) for field in ("gstr1_filing_date", "gstr3b_filing_date", "ewb_api_signal_available"))),
+            ("GST sales/API signal", any(data.get(field) for field in ("gstr1_total_sales", "gstr3b_total_sales", "gst_return_api_signal_available"))),
+            ("GST filing/API status", any(data.get(field) for field in ("gstr1_filing_date", "gstr3b_filing_date", "gst_return_api_signal_available"))),
             ("ITR filing", bool(data.get("itr_filing_date"))),
             ("ITR profit", bool(data.get("itr_net_profit"))),
             ("Banking balance", bool(data.get("banking_avg_balance"))),

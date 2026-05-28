@@ -111,12 +111,7 @@ class ScoringEngine:
         gstr1_sales = float(data.get("gstr1_total_sales") or 0)
         gstr3b_sales = float(data.get("gstr3b_total_sales") or 0)
         itr_turnover = float(data.get("itr_total_turnover") or 0)
-        ewb_invoice_value = float(data.get("ewb_total_invoice_value") or 0)
-        ewb_doc_count = float(data.get("ewb_document_count") or 0)
-        ewb_cancelled_count = float(data.get("ewb_cancelled_count") or 0)
-        ewb_rejected_count = float(data.get("ewb_rejected_count") or 0)
-        ewb_exception_pct = ScoringEngine._pct(ewb_cancelled_count + ewb_rejected_count, max(ewb_doc_count, 1)) if ewb_doc_count else 0
-        effective_turnover = float(turnover or gstr1_sales or gstr3b_sales or itr_turnover or ewb_invoice_value or 0)
+        effective_turnover = float(turnover or gstr1_sales or gstr3b_sales or itr_turnover or 0)
         monthly_turnover = effective_turnover / 12 if effective_turnover else 0
 
         gstr3b_itc = float(data.get("gstr3b_itc_availed") or 0)
@@ -129,7 +124,7 @@ class ScoringEngine:
         late_count = sum(1 for days in filing_delays if days > 0)
         avg_delay = sum(max(0, days) for days in filing_delays) / filing_count
 
-        turnover_base = max(gstr3b_sales, gstr1_sales, itr_turnover, ewb_invoice_value, effective_turnover, 1)
+        turnover_base = max(gstr3b_sales, gstr1_sales, itr_turnover, effective_turnover, 1)
         return {
             "gstr1_3b_variance_pct": ScoringEngine._pct(abs(gstr1_sales - gstr3b_sales), max(gstr3b_sales, gstr1_sales, 1)),
             "excess_itc_over_2b_pct": ScoringEngine._pct(max(0, gstr3b_itc - gstr2a_itc), turnover_base),
@@ -151,10 +146,8 @@ class ScoringEngine:
                 0,
                 100
                 - (float(data.get("gstr1_amendments_count") or 0) * 5)
-                - (float(data.get("gstr2a_discrepancies_count") or 0) * 10)
-                - (ewb_exception_pct * 0.5),
+                - (float(data.get("gstr2a_discrepancies_count") or 0) * 10),
             ),
-            "ewb_exception_pct": ewb_exception_pct,
             "data_completeness_pct": float(data.get("data_completeness_pct") or 0),
         }
 
@@ -174,8 +167,6 @@ class ScoringEngine:
             issues.append(f"ITC claimed above 2B by {metrics['excess_itc_over_2b_pct']:.1f}% of turnover")
         if metrics["amendment_frequency_pct"] > 2:
             issues.append("GST amendment frequency is above the clean-invoice threshold")
-        if metrics.get("ewb_exception_pct", 0) > 5:
-            issues.append(f"E-way bill cancelled/rejected rate is {metrics['ewb_exception_pct']:.1f}%")
         return ScoringEngine._weighted_average(parts), issues
 
     @staticmethod

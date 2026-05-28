@@ -69,6 +69,7 @@ class Client(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     gstin: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
+    gst_username: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     consent_status: Mapped[str] = mapped_column(String(20), default="pending")
     consent_token: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     consent_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -233,6 +234,119 @@ class GSTNSyncLog(Base):
     partner: Mapped["Partner"] = relationship("Partner", back_populates="gstn_sync_logs")
 
     __table_args__ = (Index("ix_gstn_sync_logs_client_id", "client_id"),)
+
+
+class GSTAuthSession(Base):
+    """GST portal auth session after taxpayer OTP consent."""
+    __tablename__ = "gst_auth_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    partner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("partners.id"), nullable=False)
+    gstin: Mapped[str] = mapped_column(String(15), nullable=False)
+    gst_username: Mapped[str] = mapped_column(String(100), nullable=False)
+    auth_token_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="otp_requested")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    __table_args__ = (
+        Index("ix_gst_auth_sessions_client_id", "client_id"),
+        Index("ix_gst_auth_sessions_gstin", "gstin"),
+    )
+
+
+class GSTFetchBatch(Base):
+    """One GST return fetch batch for costing and retry visibility."""
+    __tablename__ = "gst_fetch_batches"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    partner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("partners.id"), nullable=False)
+    financial_year: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    period_from: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    period_to: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    fetch_mode: Mapped[str] = mapped_column(String(30), default="single")
+    total_periods: Mapped[int] = mapped_column(Integer, default=0)
+    total_api_calls: Mapped[int] = mapped_column(Integer, default=0)
+    successful_calls: Mapped[int] = mapped_column(Integer, default=0)
+    failed_calls: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[float] = mapped_column(Float, default=0)
+    status: Mapped[str] = mapped_column(String(30), default="processing")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_gst_fetch_batches_client_id", "client_id"),
+        Index("ix_gst_fetch_batches_partner_id", "partner_id"),
+    )
+
+
+class GSTAPIFetchLog(Base):
+    """Audit and costing log for every GST Return API call."""
+    __tablename__ = "gst_api_fetch_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    batch_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("gst_fetch_batches.id"), nullable=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    gstin: Mapped[str] = mapped_column(String(15), nullable=False)
+    gst_username: Mapped[str] = mapped_column(String(100), nullable=False)
+    return_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    period: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    endpoint: Mapped[Optional[str]] = mapped_column(String(600), nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    status_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    estimated_cost: Mapped[float] = mapped_column(Float, default=0)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    __table_args__ = (
+        Index("ix_gst_api_fetch_logs_batch_id", "batch_id"),
+        Index("ix_gst_api_fetch_logs_client_id", "client_id"),
+        Index("ix_gst_api_fetch_logs_period", "period"),
+    )
+
+
+class GSTReturnRawData(Base):
+    """Provider response payloads stored separately from normalized scoring data."""
+    __tablename__ = "gst_return_raw_data"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    batch_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("gst_fetch_batches.id"), nullable=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    gstin: Mapped[str] = mapped_column(String(15), nullable=False)
+    period: Mapped[str] = mapped_column(String(6), nullable=False)
+    return_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    raw_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    provider: Mapped[str] = mapped_column(String(80), default="charteredinfo_gst_return")
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    __table_args__ = (
+        Index("ix_gst_return_raw_data_client_period", "client_id", "period"),
+        Index("ix_gst_return_raw_data_batch_id", "batch_id"),
+    )
+
+
+class GSTReturnNormalizedData(Base):
+    """Return data normalized for Vertibis risk scoring."""
+    __tablename__ = "gst_return_normalized_data"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    batch_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("gst_fetch_batches.id"), nullable=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    gstin: Mapped[str] = mapped_column(String(15), nullable=False)
+    period: Mapped[str] = mapped_column(String(6), nullable=False)
+    return_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    normalized_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    __table_args__ = (
+        Index("ix_gst_return_normalized_client_period", "client_id", "period"),
+        Index("ix_gst_return_normalized_batch_id", "batch_id"),
+    )
 
 
 class DataReconciliation(Base):

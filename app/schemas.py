@@ -106,6 +106,7 @@ class ClientCreate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     gstin: Optional[str] = None
+    gst_username: Optional[str] = None
     industry: Optional[str] = "trading"  # manufacturing / trading / services / it
     turnover: Optional[float] = None
 
@@ -115,6 +116,7 @@ class ClientUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     gstin: Optional[str] = None
+    gst_username: Optional[str] = None
     industry: Optional[str] = None
     turnover: Optional[float] = None
     consent_status: Optional[str] = None
@@ -131,6 +133,7 @@ class ClientOut(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     gstin: Optional[str] = None
+    gst_username: Optional[str] = None
     industry: Optional[str] = None
     turnover: Optional[float] = None
     consent_status: str

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth_utils import get_current_partner
 from app.database import get_db
-from app.models import Client, FileUpload, DataPoint, HealthScore, GSTNSyncLog, Partner, CreditTransaction
+from app.models import Client, FileUpload, DataPoint, HealthScore, GSTReturnNormalizedData, Partner, CreditTransaction
 from app.schemas import FileUploadOut, ScoreCalculateResponse, ScoreComponentsOut
 from app.extractors import DataExtractor
 from app.scoring_engine import ScoringEngine
@@ -92,35 +92,53 @@ def _merge_extracted(target: dict, partial: dict, key: str, index: int) -> None:
         target[f"{key}_{index}_{name}"] = value
 
 
-def _latest_taxpro_ewb_summary(db: Session, client_id: uuid.UUID) -> dict:
-    log = (
-        db.query(GSTNSyncLog)
-        .filter(GSTNSyncLog.client_id == client_id, GSTNSyncLog.sync_type == "taxpro_ewb_report_signal")
-        .order_by(GSTNSyncLog.request_timestamp.desc())
-        .first()
+def _latest_gst_return_summary(db: Session, client_id: uuid.UUID) -> dict:
+    rows = (
+        db.query(GSTReturnNormalizedData)
+        .filter(GSTReturnNormalizedData.client_id == client_id)
+        .order_by(GSTReturnNormalizedData.fetched_at.desc())
+        .limit(36)
+        .all()
     )
-    if not log or not isinstance(log.error_details, dict):
+    if not rows:
         return {}
-    summary = log.error_details.get("summary")
-    if not isinstance(summary, dict):
-        return {}
-    return {
-        "ewb_document_count": summary.get("ewb_document_count") or 0,
-        "ewb_active_count": summary.get("ewb_active_count") or 0,
-        "ewb_cancelled_count": summary.get("ewb_cancelled_count") or 0,
-        "ewb_rejected_count": summary.get("ewb_rejected_count") or 0,
-        "ewb_total_invoice_value": summary.get("ewb_total_invoice_value") or 0,
-        "ewb_taxable_value": summary.get("ewb_taxable_value") or 0,
+
+    summary: dict = {
+        "gst_return_api_signal_available": True,
+        "gstr1_total_sales": 0,
+        "gstr1_invoice_count": 0,
+        "gstr3b_total_sales": 0,
+        "gstr3b_itc_availed": 0,
+        "gstr3b_gst_payment": 0,
+        "gstr2a_itc_received": 0,
+        "gstr2a_supplier_count": 0,
     }
+    seen_period_returns: set[tuple[str, str]] = set()
+    for row in rows:
+        key = (row.period, row.return_type)
+        if key in seen_period_returns:
+            continue
+        seen_period_returns.add(key)
+        data = row.normalized_json or {}
+        if row.return_type == "gstr1":
+            summary["gstr1_total_sales"] += float(data.get("b2b_taxable_value") or 0)
+            summary["gstr1_invoice_count"] += int(data.get("invoice_count") or 0)
+        elif row.return_type == "gstr3b":
+            summary["gstr3b_total_sales"] += float(data.get("outward_taxable_value") or 0)
+            summary["gstr3b_itc_availed"] += float(data.get("eligible_itc") or 0)
+            summary["gstr3b_gst_payment"] += float(data.get("cash_paid") or data.get("output_tax") or 0)
+        elif row.return_type == "gstr2b":
+            summary["gstr2a_itc_received"] += float(data.get("eligible_itc") or 0)
+            summary["gstr2a_supplier_count"] += int(data.get("supplier_count") or 0)
+    return summary
 
 
-def _merge_taxpro_ewb_summary(target: dict, summary: dict) -> None:
+def _merge_gst_return_summary(target: dict, summary: dict) -> None:
     if not summary:
         return
     target.update(summary)
-    target["gst_data_source"] = "taxpro_ewb_api"
-    target["latest_data_source"] = "taxpro_ewb_api"
-    target["ewb_api_signal_available"] = True
+    target["gst_data_source"] = "gst_return_api"
+    target["latest_data_source"] = "gst_return_api"
 
 
 def _store_api_data_points(db: Session, client_id: uuid.UUID, summary: dict) -> None:
@@ -137,7 +155,7 @@ def _store_api_data_points(db: Session, client_id: uuid.UUID, summary: dict) -> 
             data_value=float(numeric_value) if numeric_value is not None else None,
             data_value_str=None if numeric_value is not None else str(value),
             data_unit="count" if key.endswith("_count") else "INR",
-            source="taxpro_ewb_api",
+            source="gst_return_api",
             verified=True,
         ))
 
@@ -363,13 +381,14 @@ async def upload_files(
         "gst_api_request_id": str(form.get("gst_api_request_id") or ""),
         "gst_return_period_from": str(form.get("gst_return_period_from") or ""),
         "gst_return_period_to": str(form.get("gst_return_period_to") or ""),
-        "gst_ewb_test_date": str(form.get("gst_ewb_test_date") or ""),
+        "gst_return_batch_id": str(form.get("gst_return_batch_id") or ""),
+        "gst_return_periods": str(form.get("gst_return_periods") or ""),
         "gst_file_count": gst_count,
         "itr_file_count": itr_count,
         "banking_file_count": sum(1 for key, _ in deduped_entries if key == "banking"),
     }
-    api_summary = _latest_taxpro_ewb_summary(db, client_id) if gst_api_requested else {}
-    _merge_taxpro_ewb_summary(all_extracted, api_summary)
+    api_summary = _latest_gst_return_summary(db, client_id) if gst_api_requested else {}
+    _merge_gst_return_summary(all_extracted, api_summary)
     detected_gstins: set[str] = set()
     prepared_files: list[tuple[str, str, bytes, str, dict]] = []
 

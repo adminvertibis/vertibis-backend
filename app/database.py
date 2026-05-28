@@ -63,6 +63,7 @@ def ensure_runtime_schema():
         "UPDATE partners SET plan = 'starter' WHERE plan IS NULL",
         "ALTER TABLE clients ADD COLUMN IF NOT EXISTS email VARCHAR(255)",
         "ALTER TABLE clients ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS gst_username VARCHAR(100)",
         "ALTER TABLE clients ADD COLUMN IF NOT EXISTS consent_status VARCHAR(20) DEFAULT 'pending'",
         "ALTER TABLE clients ADD COLUMN IF NOT EXISTS consent_token VARCHAR(120)",
         "ALTER TABLE clients ADD COLUMN IF NOT EXISTS consent_requested_at TIMESTAMP",
