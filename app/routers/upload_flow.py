@@ -12,12 +12,14 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from app.auth_utils import get_current_partner
 from app.database import get_db
 from app.models import Client, FileUpload, DataPoint, HealthScore, Partner
 from app.extractors import DataExtractor
 from app.scoring_engine import ScoringEngine
 from app.advisory_generator import AdvisoryGenerator
 from app.pricing_config import get_credit_rule, get_size_band
+from app.upload_security import safe_upload_filename, validate_upload_bytes
 
 router = APIRouter(prefix="/api/v1", tags=["Upload Wizard"])
 
@@ -65,13 +67,14 @@ def _score_label(score: float) -> tuple[str, str]:
     return "CRITICAL", "#ef4444"
 
 
-def _save_bytes(content: bytes, filename: str, client_id: uuid.UUID) -> str:
+def _save_bytes(content: bytes, filename: str, client_id: uuid.UUID) -> tuple[str, str]:
     d = os.path.join(UPLOAD_DIR, str(client_id))
     os.makedirs(d, exist_ok=True)
-    path = os.path.join(d, filename)
+    stored_filename = safe_upload_filename(filename)
+    path = os.path.join(d, stored_filename)
     with open(path, "wb") as f:
         f.write(content)
-    return path
+    return path, stored_filename
 
 
 def _store_data_points(
@@ -159,7 +162,7 @@ async def upload_and_score(
     industry: str = Form("trading"),
     turnover: float = Form(0),
     gstin: str = Form(""),
-    partner_id: str = Form(...),
+    partner_id: Optional[str] = Form(None),
 
     # FY 2024-25 GST
     gstr1_fy1: Optional[UploadFile] = File(None),
@@ -177,16 +180,13 @@ async def upload_and_score(
     itr_curr: Optional[UploadFile] = File(None),
 
     db: Session = Depends(get_db),
+    current_partner: Partner = Depends(get_current_partner),
 ):
     # ── Validate partner ──────────────────────────────────────────────────────
-    try:
-        pid = uuid.UUID(partner_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid partner_id")
-
-    partner = db.get(Partner, pid)
-    if not partner:
-        raise HTTPException(status_code=404, detail="Partner not found")
+    pid = current_partner.id
+    partner = current_partner
+    if partner_id and str(partner_id) != str(pid):
+        raise HTTPException(status_code=403, detail="partner_id does not match authenticated partner")
     # ── Create client ─────────────────────────────────────────────────────────
     client = Client(
         partner_id=pid,
@@ -224,18 +224,15 @@ async def upload_and_score(
             continue
 
         content_bytes = await upload.read()
-        if not content_bytes:
-            if is_required:
-                files_missing.append(f"{file_type_label} ({fy_label})")
-            continue
+        validate_upload_bytes(content_bytes, upload.filename)
 
         content_str = content_bytes.decode("utf-8", errors="replace")
-        saved_path = _save_bytes(content_bytes, upload.filename or f"{key}.dat", client.id)
+        saved_path, stored_filename = _save_bytes(content_bytes, upload.filename or f"{key}.dat", client.id)
 
         fu = FileUpload(
             client_id=client.id,
             partner_id=pid,
-            file_name=upload.filename or f"{key}.dat",
+            file_name=stored_filename,
             file_type=f"{file_type_label}_{fy_label}",
             file_path=saved_path,
             file_size=len(content_bytes),

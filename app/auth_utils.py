@@ -80,17 +80,11 @@ def get_current_partner(
 
 
 def require_admin(request: Request) -> None:
-    configured = os.getenv("ADMIN_API_KEY")
-    if not configured:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Admin API key is not configured",
-        )
-
-    supplied = request.headers.get("x-admin-token")
     auth = request.headers.get("authorization", "")
-    if not supplied and auth.lower().startswith("bearer "):
-        supplied = auth.split(" ", 1)[1].strip()
+    if auth.lower().startswith("bearer "):
+        token = auth.split(" ", 1)[1].strip()
+        payload = decode_access_token(token)
+        if payload.get("role") == "admin":
+            return
 
-    if not supplied or not hmac.compare_digest(supplied, configured):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")

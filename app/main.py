@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.database import create_tables, ensure_runtime_schema
 from app.routers import auth, partners, clients, uploads, scores, admin, upload_flow, dashboard, reports
@@ -39,7 +39,33 @@ app.include_router(uploads.router)
 app.include_router(scores.router)
 app.include_router(reports.router)
 app.include_router(admin.router)
-app.include_router(upload_flow.router)
+if os.getenv("ENABLE_LEGACY_UPLOAD_FLOW", "false").lower() in {"1", "true", "yes", "on"}:
+    app.include_router(upload_flow.router)
+
+
+MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", os.getenv("MAX_UPLOAD_BYTES", str(15 * 1024 * 1024))))
+
+
+@app.middleware("http")
+async def apply_security_headers(request, call_next):
+    content_length = request.headers.get("content-length")
+    try:
+        request_size = int(content_length or 0)
+    except ValueError:
+        request_size = 0
+    if request_size > MAX_REQUEST_BYTES:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": f"Request body exceeds the {MAX_REQUEST_BYTES // (1024 * 1024)} MB limit."},
+        )
+
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 # ── Static files ──────────────────────────────────────────────────────────────
 if os.path.isdir("static"):

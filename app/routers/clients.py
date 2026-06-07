@@ -119,22 +119,31 @@ def _normalize_gstin(value: object) -> str:
 
 
 def _token_key() -> bytes:
-    secret = os.getenv("GST_TOKEN_SECRET") or os.getenv("JWT_SECRET") or "vertibis-local-gst-token-secret"
-    return hashlib.sha256(secret.encode("utf-8")).digest()
+    secret = os.getenv("GST_TOKEN_SECRET")
+    if not secret:
+        raise HTTPException(status_code=503, detail="GST_TOKEN_SECRET is not configured")
+    return base64.urlsafe_b64encode(hashlib.sha256(secret.encode("utf-8")).digest())
+
+
+def _token_cipher():
+    try:
+        from cryptography.fernet import Fernet
+    except Exception:
+        raise HTTPException(status_code=503, detail="cryptography package is required for GST token storage")
+    return Fernet(_token_key())
 
 
 def _protect_token(token: str) -> str:
-    raw = token.encode("utf-8")
-    key = _token_key()
-    protected = bytes(byte ^ key[index % len(key)] for index, byte in enumerate(raw))
-    return base64.urlsafe_b64encode(protected).decode("ascii")
+    return _token_cipher().encrypt(token.encode("utf-8")).decode("ascii")
 
 
 def _unprotect_token(value: str) -> str:
-    raw = base64.urlsafe_b64decode(value.encode("ascii"))
-    key = _token_key()
-    token = bytes(byte ^ key[index % len(key)] for index, byte in enumerate(raw))
-    return token.decode("utf-8")
+    try:
+        return _token_cipher().decrypt(value.encode("ascii")).decode("utf-8")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="GST session could not be decrypted. Please request OTP again.")
 
 
 def _client_or_404(db: Session, client_id: uuid.UUID, partner: Partner) -> Client:
@@ -509,14 +518,15 @@ def bulk_create_clients(payload: ClientBulkCreateRequest, db: Session = Depends(
 
 def _consent_url(token: str) -> str:
     base = (
-        os.getenv("CLIENT_CONSENT_BASE_URL")
+        os.getenv("CONSENT_LINK_BASE_URL")
+        or os.getenv("CLIENT_CONSENT_BASE_URL")
         or os.getenv("FRONTEND_CONSENT_URL")
         or os.getenv("API_PUBLIC_BASE_URL")
         or ""
     ).rstrip("/")
     if base:
         return f"{base}/consent/{token}"
-    return f"/api/v1/clients/consent/accept/{token}"
+    return f"/consent/{token}"
 
 
 def _whatsapp_url(phone: str | None, message: str) -> str | None:
@@ -591,12 +601,17 @@ def sign_client_consent(
     return client
 
 
-@router.get("/consent/accept/{token}", summary="Accept client consent from email link")
 @router.post("/consent/accept/{token}", summary="Accept client consent from email link")
 def accept_client_consent(token: str, db: Session = Depends(get_db)):
     client = db.query(Client).filter(Client.consent_token == token).first()
     if not client:
         raise HTTPException(status_code=404, detail="Consent link is invalid or already used")
+    ttl_days = int(os.getenv("CONSENT_TOKEN_TTL_DAYS", "30") or "30")
+    if client.consent_requested_at and client.consent_requested_at < datetime.utcnow() - timedelta(days=ttl_days):
+        client.consent_status = "expired"
+        client.consent_token = None
+        db.commit()
+        raise HTTPException(status_code=410, detail="Consent link has expired. Please request a new consent link.")
 
     client.consent_status = "signed"
     client.consent_token = None

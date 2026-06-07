@@ -14,6 +14,7 @@ from app.extractors import DataExtractor
 from app.scoring_engine import ScoringEngine
 from app.advisory_generator import AdvisoryGenerator
 from app.pricing_config import get_credit_rule, get_size_band, normalize_report_slug
+from app.upload_security import safe_upload_filename, validate_upload_bytes
 
 router = APIRouter(prefix="/api/v1/clients", tags=["File Uploads"])
 
@@ -160,13 +161,14 @@ def _store_api_data_points(db: Session, client_id: uuid.UUID, summary: dict) -> 
         ))
 
 
-def _save_file(content: bytes, filename: str, client_id: uuid.UUID) -> str:
+def _save_file(content: bytes, filename: str, client_id: uuid.UUID) -> tuple[str, str]:
     client_dir = os.path.join(UPLOAD_DIR, str(client_id))
     os.makedirs(client_dir, exist_ok=True)
-    path = os.path.join(client_dir, filename)
+    stored_filename = safe_upload_filename(filename)
+    path = os.path.join(client_dir, stored_filename)
     with open(path, "wb") as f:
         f.write(content)
-    return path
+    return path, stored_filename
 
 
 def _normalize_report_type(value: object) -> str:
@@ -395,6 +397,7 @@ async def upload_files(
     for index, (key, upload) in enumerate(deduped_entries, start=1):
         content_bytes = await upload.read()
         filename = upload.filename or f"{key}_{index}.dat"
+        validate_upload_bytes(content_bytes, filename)
         content_text = DataExtractor.content_to_text(content_bytes, filename)
         if key in {"gstr1", "gstr3b", "gstr2a"}:
             detected_gstins.update(_detect_gstins(filename, content_text))
@@ -422,11 +425,11 @@ async def upload_files(
         )
 
     for index, (key, filename, content_bytes, _content_text, partial) in enumerate(prepared_files, start=1):
-        saved_path = _save_file(content_bytes, filename, client_id)
+        saved_path, stored_filename = _save_file(content_bytes, filename, client_id)
         fu = FileUpload(
             client_id=client_id,
             partner_id=partner_id,
-            file_name=filename,
+            file_name=stored_filename,
             file_type=FILE_TYPE_MAP[key],
             file_path=saved_path,
             file_size=len(content_bytes),

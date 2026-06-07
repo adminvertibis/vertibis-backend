@@ -44,22 +44,33 @@ def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
-def _create_access_token(partner: Partner) -> str:
+def _create_role_token(sub: str, email: str, role: str, expires_hours: int, extra: dict | None = None) -> str:
     secret = get_jwt_secret()
     now = datetime.utcnow()
-    expires = now + timedelta(hours=int(os.getenv("JWT_EXPIRE_HOURS", "24")))
+    expires = now + timedelta(hours=expires_hours)
     header = {"alg": "HS256", "typ": "JWT"}
     payload = {
-        "sub": str(partner.id),
-        "email": partner.email,
-        "role": partner.role or "ca_partner",
+        "sub": sub,
+        "email": email,
+        "role": role,
         "iat": int(now.timestamp()),
         "exp": int(expires.timestamp()),
     }
+    if extra:
+        payload.update(extra)
 
     signing_input = f"{_b64url(json.dumps(header, separators=(',', ':')).encode())}.{_b64url(json.dumps(payload, separators=(',', ':')).encode())}"
     signature = hmac.new(secret.encode("utf-8"), signing_input.encode("ascii"), hashlib.sha256).digest()
     return f"{signing_input}.{_b64url(signature)}"
+
+
+def _create_access_token(partner: Partner) -> str:
+    return _create_role_token(
+        sub=str(partner.id),
+        email=partner.email,
+        role=partner.role or "ca_partner",
+        expires_hours=int(os.getenv("JWT_EXPIRE_HOURS", "24")),
+    )
 
 
 def _auth_response(partner: Partner) -> AuthResponse:
@@ -84,8 +95,7 @@ def _admin_auth_response(payload: LoginRequest) -> AuthResponse | None:
         return None
 
     admin_password = os.getenv("ADMIN_PASSWORD")
-    admin_api_key = os.getenv("ADMIN_API_KEY")
-    if not admin_password or not admin_api_key:
+    if not admin_password:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Admin credentials are not configured",
@@ -95,7 +105,13 @@ def _admin_auth_response(payload: LoginRequest) -> AuthResponse | None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     return AuthResponse(
-        access_token=admin_api_key,
+        access_token=_create_role_token(
+            sub="admin",
+            email=admin_email,
+            role="admin",
+            expires_hours=int(os.getenv("ADMIN_JWT_EXPIRE_HOURS", "8")),
+            extra={"aud": "vertibis-admin"},
+        ),
         user=AuthUserOut(
             id="admin",
             name="Vertibis Admin",
