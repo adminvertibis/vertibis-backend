@@ -105,9 +105,15 @@ class ClientCreate(BaseModel):
     business_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    mobile: Optional[str] = None
     gstin: Optional[str] = None
+    pan: Optional[str] = None
     gst_username: Optional[str] = None
     industry: Optional[str] = "trading"  # manufacturing / trading / services / it
+    business_category: Optional[str] = None
+    turnover_band: Optional[str] = None
+    client_size_band: Optional[str] = None
+    status: Optional[str] = "onboarded"
     turnover: Optional[float] = None
 
 class ClientUpdate(BaseModel):
@@ -115,9 +121,15 @@ class ClientUpdate(BaseModel):
     business_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    mobile: Optional[str] = None
     gstin: Optional[str] = None
+    pan: Optional[str] = None
     gst_username: Optional[str] = None
     industry: Optional[str] = None
+    business_category: Optional[str] = None
+    turnover_band: Optional[str] = None
+    client_size_band: Optional[str] = None
+    status: Optional[str] = None
     turnover: Optional[float] = None
     consent_status: Optional[str] = None
     consent_signed_at: Optional[datetime] = None
@@ -132,9 +144,15 @@ class ClientOut(BaseModel):
     business_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    mobile: Optional[str] = None
     gstin: Optional[str] = None
+    pan: Optional[str] = None
     gst_username: Optional[str] = None
     industry: Optional[str] = None
+    business_category: Optional[str] = None
+    turnover_band: Optional[str] = None
+    client_size_band: Optional[str] = None
+    status: Optional[str] = None
     turnover: Optional[float] = None
     consent_status: str
     consent_requested_at: Optional[datetime] = None
