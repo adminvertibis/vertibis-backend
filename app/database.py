@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Optional
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
@@ -27,6 +28,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+STARTUP_SCHEMA_ERROR: Optional[str] = None
 
 
 class Base(DeclarativeBase):
@@ -45,6 +47,17 @@ def create_tables():
     import app.models  # noqa: F401 — registers all models
     Base.metadata.create_all(bind=engine)
 
+
+
+def initialize_database_schema() -> None:
+    """Run additive schema setup without crashing the serverless app."""
+    global STARTUP_SCHEMA_ERROR
+    try:
+        create_tables()
+        ensure_runtime_schema()
+        STARTUP_SCHEMA_ERROR = None
+    except Exception as exc:
+        STARTUP_SCHEMA_ERROR = f"{type(exc).__name__}: {exc}"
 
 
 def ensure_runtime_schema():

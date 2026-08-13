@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.exc import OperationalError
 
-from app.database import create_tables, ensure_runtime_schema
+from app import database
+from app.database import initialize_database_schema
 from app.routers import auth, partners, clients, uploads, scores, admin, upload_flow, dashboard, reports
 from app.extractors import DataExtractor
 from app.scoring_engine import ScoringEngine
@@ -67,6 +69,14 @@ async def apply_security_headers(request, call_next):
     response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
+
+@app.exception_handler(OperationalError)
+async def database_operational_error_handler(request, exc):
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database is unavailable. Check DATABASE_URL / Railway Postgres connectivity."},
+    )
+
 # ── Static files ──────────────────────────────────────────────────────────────
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -74,15 +84,18 @@ if os.path.isdir("static"):
 
 @app.on_event("startup")
 def on_startup():
-    create_tables()
-    ensure_runtime_schema()
+    initialize_database_schema()
 
 
 # ── Utility endpoints ─────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok", "version": "2.0.0"}
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "database": "ok" if database.STARTUP_SCHEMA_ERROR is None else "unavailable",
+    }
 
 
 @app.get("/dashboard", include_in_schema=False)

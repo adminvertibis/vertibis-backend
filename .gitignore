@@ -1,6 +1,7 @@
 .vercel
 .env
 .env.local
+.venv/
 .claude
 __pycache__/
 *.py[cod]
